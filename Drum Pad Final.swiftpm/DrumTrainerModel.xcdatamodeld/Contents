@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="21513" systemVersion="22A380" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="">
+    <entity name="AudioAssetsEntity" representedClassName="AudioAssetsEntity" syncable="YES">
+        <attribute name="backingTrackURL" optional="YES" attributeType="String"/>
+        <attribute name="clickTrackURL" optional="YES" attributeType="String"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="previewURL" optional="YES" attributeType="String"/>
+        <attribute name="stemURLsData" attributeType="Binary"/>
+        <relationship name="lessons" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Lesson" inverseName="audioAssets" inverseEntity="Lesson"/>
+    </entity>
+    <entity name="Course" representedClassName="Course" syncable="YES">
+        <attribute name="courseDescription" attributeType="String"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="difficulty" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="estimatedDuration" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="isPublished" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="tags" attributeType="String"/>
+        <attribute name="title" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="lessons" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Lesson" inverseName="course" inverseEntity="Lesson"/>
+    </entity>
+    <entity name="DailyProgress" representedClassName="DailyProgress" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="goalAchieved" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="lessonsCompleted" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="practiceTimeMinutes" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="starsEarned" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="userId" attributeType="String"/>
+        <relationship name="userProgress" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProgress" inverseName="dailyProgress" inverseEntity="UserProgress"/>
+    </entity>
+    <entity name="Lesson" representedClassName="Lesson" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="courseId" optional="YES" attributeType="String"/>
+        <attribute name="defaultBPM" attributeType="Float" defaultValueString="120" usesScalarValueType="YES"/>
+        <attribute name="difficulty" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="duration" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="instrument" attributeType="String"/>
+        <attribute name="tags" attributeType="String"/>
+        <attribute name="timeSignatureDenominator" attributeType="Integer 16" defaultValueString="4" usesScalarValueType="YES"/>
+        <attribute name="timeSignatureNumerator" attributeType="Integer 16" defaultValueString="4" usesScalarValueType="YES"/>
+        <attribute name="title" attributeType="String"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="audioAssets" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="AudioAssetsEntity" inverseName="lessons" inverseEntity="AudioAssetsEntity"/>
+        <relationship name="course" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Course" inverseName="lessons" inverseEntity="Course"/>
+        <relationship name="scoreResults" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ScoreResultEntity" inverseName="lesson" inverseEntity="ScoreResultEntity"/>
+        <relationship name="scoringProfile" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="ScoringProfileEntity" inverseName="lessons" inverseEntity="ScoringProfileEntity"/>
+        <relationship name="steps" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="LessonStep" inverseName="lesson" inverseEntity="LessonStep"/>
+    </entity>
+    <entity name="LessonStep" representedClassName="LessonStep" syncable="YES">
+        <attribute name="assistLevel" attributeType="String"/>
+        <attribute name="bpmOverride" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="lessonId" attributeType="String"/>
+        <attribute name="order" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="stepDescription" attributeType="String"/>
+        <attribute name="targetEventsData" attributeType="Binary"/>
+        <attribute name="title" attributeType="String"/>
+        <relationship name="lesson" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Lesson" inverseName="steps" inverseEntity="Lesson"/>
+    </entity>
+    <entity name="ScoreResultEntity" representedClassName="ScoreResultEntity" syncable="YES">
+        <attribute name="completedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="completionTime" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="earlyCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="extraCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="isBlackStar" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="isPlatinum" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="lateCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lessonId" attributeType="String"/>
+        <attribute name="maxStreak" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="missCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="perfectCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="playbackMode" attributeType="String"/>
+        <attribute name="starRating" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="streakCount" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="timingResultsData" attributeType="Binary"/>
+        <attribute name="totalScore" attributeType="Float" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <relationship name="lesson" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Lesson" inverseName="scoreResults" inverseEntity="Lesson"/>
+        <relationship name="userProgress" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserProgress" inverseName="scoreResults" inverseEntity="UserProgress"/>
+    </entity>
+    <entity name="ScoringProfileEntity" representedClassName="ScoringProfileEntity" syncable="YES">
+        <attribute name="earlyWindow" attributeType="Double" defaultValueString="0.05" usesScalarValueType="YES"/>
+        <attribute name="extraPenalty" attributeType="Float" defaultValueString="0.05" usesScalarValueType="YES"/>
+        <attribute name="gradePenaltyMultiplier" attributeType="Float" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="lateWindow" attributeType="Double" defaultValueString="0.05" usesScalarValueType="YES"/>
+        <attribute name="missThreshold" attributeType="Double" defaultValueString="0.1" usesScalarValueType="YES"/>
+        <attribute name="perfectWindow" attributeType="Double" defaultValueString="0.02" usesScalarValueType="YES"/>
+        <attribute name="streakBonus" attributeType="Float" defaultValueString="0.01" usesScalarValueType="YES"/>
+        <relationship name="lessons" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Lesson" inverseName="scoringProfile" inverseEntity="Lesson"/>
+    </entity>
+    <entity name="UserProgress" representedClassName="UserProgress" syncable="YES">
+        <attribute name="createdAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="currentLevel" attributeType="Integer 16" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="currentStreak" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="dailyGoalMinutes" attributeType="Integer 16" defaultValueString="5" usesScalarValueType="YES"/>
+        <attribute name="id" attributeType="String"/>
+        <attribute name="lastPracticeDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="maxStreak" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalPracticeTime" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="totalStars" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="totalTrophies" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="updatedAt" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="userId" attributeType="String"/>
+        <relationship name="dailyProgress" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="DailyProgress" inverseName="userProgress" inverseEntity="DailyProgress"/>
+        <relationship name="scoreResults" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ScoreResultEntity" inverseName="userProgress" inverseEntity="ScoreResultEntity"/>
+    </entity>
+</model>
