@@ -1,0 +1,149 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+      
+    - name: Show Xcode Version
+      run: xcodebuild -version
+      
+    - name: Show Available Simulators
+      run: xcrun simctl list devicetypes
+      
+    - name: Build and Test
+      run: |
+        cd "Drum Pad Final.swiftpm"
+        xcodebuild test \
+          -scheme "Drum Pad Final" \
+          -destination "platform=iOS Simulator,name=iPad Pro (12.9-inch) (6th generation),OS=17.2" \
+          -enableCodeCoverage YES \
+          -derivedDataPath DerivedData
+          
+    - name: Generate Code Coverage Report
+      run: |
+        cd "Drum Pad Final.swiftpm"
+        xcrun xccov view DerivedData/Logs/Test/*.xcresult --report --only-targets
+        
+    - name: Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        
+  lint:
+    name: SwiftLint
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Install SwiftLint
+      run: brew install swiftlint
+      
+    - name: Run SwiftLint
+      run: |
+        cd "Drum Pad Final.swiftpm"
+        swiftlint lint --reporter github-actions-logging
+        
+  build:
+    name: Build Archive
+    runs-on: macos-latest
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+      
+    - name: Build Archive
+      run: |
+        cd "Drum Pad Final.swiftpm"
+        xcodebuild archive \
+          -scheme "Drum Pad Final" \
+          -destination "generic/platform=iOS" \
+          -archivePath "MelodicDrumTrainer.xcarchive" \
+          -configuration Release
+          
+    - name: Upload Archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: MelodicDrumTrainer-Archive
+        path: "Drum Pad Final.swiftpm/MelodicDrumTrainer.xcarchive"
+        retention-days: 30
+
+  property-tests:
+    name: Property-Based Tests
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Select Xcode Version
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+      
+    - name: Run Property Tests
+      run: |
+        cd "Drum Pad Final.swiftpm"
+        # Run property tests with increased iterations for CI
+        xcodebuild test \
+          -scheme "Drum Pad Final" \
+          -destination "platform=iOS Simulator,name=iPad Pro (12.9-inch) (6th generation),OS=17.2" \
+          -only-testing "Drum_Pad_FinalTests/ScoreEnginePropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/LessonEnginePropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/MIDIConnectionPropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/ContentManagementPropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/ContentBrowserPropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/SettingsPropertyTests" \
+          -only-testing "Drum_Pad_FinalTests/UIComponentPropertyTests"
+          
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: property-test-results
+        path: "Drum Pad Final.swiftpm/DerivedData/Logs/Test/"
+        retention-days: 7
+
+  security-scan:
+    name: Security Scan
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Run Security Scan
+      run: |
+        # Check for common security issues in Swift code
+        find "Drum Pad Final.swiftpm" -name "*.swift" -exec grep -l "NSLog\|print(" {} \; > debug_statements.txt || true
+        if [ -s debug_statements.txt ]; then
+          echo "Warning: Debug statements found in production code:"
+          cat debug_statements.txt
+        fi
+        
+        # Check for hardcoded secrets or API keys
+        find "Drum Pad Final.swiftpm" -name "*.swift" -exec grep -i "api.*key\|secret\|password\|token" {} \; > potential_secrets.txt || true
+        if [ -s potential_secrets.txt ]; then
+          echo "Warning: Potential secrets found:"
+          cat potential_secrets.txt
+          exit 1
+        fi

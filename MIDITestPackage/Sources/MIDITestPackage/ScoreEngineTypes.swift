@@ -24,13 +24,13 @@ public struct MIDIEvent: Codable {
     public let timestamp: TimeInterval
     public let noteNumber: Int
     public let velocity: Int
-    public let channel: Int
+    public let isNoteOn: Bool
     
-    public init(timestamp: TimeInterval, noteNumber: Int, velocity: Int, channel: Int) {
+    public init(timestamp: TimeInterval, noteNumber: Int, velocity: Int, isNoteOn: Bool) {
         self.timestamp = timestamp
         self.noteNumber = noteNumber
         self.velocity = velocity
-        self.channel = channel
+        self.isNoteOn = isNoteOn
     }
 }
 

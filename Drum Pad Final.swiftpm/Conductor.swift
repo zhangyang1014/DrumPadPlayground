@@ -12,6 +12,16 @@ enum MetronomeSound: String, CaseIterable {
     case wood = "wood"
     case digital = "digital"
     case cowbell = "cowbell"
+    case rimshot = "rimshot"
+    case clap = "clap"
+    case hihat = "hihat"
+    case shaker = "shaker"
+    case triangle = "triangle"
+    case bell = "bell"
+    case vintage = "vintage"
+    case modern = "modern"
+    case soft = "soft"
+    case sharp = "sharp"
     
     var displayName: String {
         switch self {
@@ -21,6 +31,16 @@ enum MetronomeSound: String, CaseIterable {
         case .wood: return "Wood"
         case .digital: return "Digital"
         case .cowbell: return "Cowbell"
+        case .rimshot: return "Rimshot"
+        case .clap: return "Clap"
+        case .hihat: return "Hi-Hat"
+        case .shaker: return "Shaker"
+        case .triangle: return "Triangle"
+        case .bell: return "Bell"
+        case .vintage: return "Vintage"
+        case .modern: return "Modern"
+        case .soft: return "Soft"
+        case .sharp: return "Sharp"
         }
     }
     
@@ -170,6 +190,9 @@ class Conductor: ObservableObject {
     // Real-time Scoring Engine
     let scoreEngine = ScoreEngine()
     
+    // Error Handling
+    @Published var errorPresenter: ErrorPresenter?
+    
     // Metronome Management
     private var metronomeTimer: Timer?
     private var countInTimer: Timer?
@@ -306,12 +329,15 @@ class Conductor: ObservableObject {
             try engine.start() 
         } catch {
             Log("AudioKit did not start! \(error)")
+            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
+            return
         }
         do {
             let files = drumSamples.compactMap { $0.audioFile }
             try drums.loadAudioFiles(files)
         } catch {
             Log("Could not load audio files \(error)")
+            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
         }
         
         // Load metronome sounds
@@ -346,6 +372,7 @@ class Conductor: ObservableObject {
             print("Error creating MIDI client: \(status)")
             DispatchQueue.main.async {
                 self.midiConnectionStatus = .error
+                self.errorPresenter?.presentError(.midiConnectionFailure(deviceName: "Unknown", underlying: nil))
             }
             return
         }
@@ -361,6 +388,7 @@ class Conductor: ObservableObject {
             print("Error creating MIDI input port: \(inputStatus)")
             DispatchQueue.main.async {
                 self.midiConnectionStatus = .error
+                self.errorPresenter?.presentError(.midiConnectionFailure(deviceName: "Input Port", underlying: nil))
             }
         }
     }
@@ -503,6 +531,7 @@ class Conductor: ObservableObject {
                 print("Failed to connect to MIDI source: \(status)")
                 DispatchQueue.main.async {
                     self.midiConnectionStatus = .error
+                    self.errorPresenter?.presentError(.midiConnectionFailure(deviceName: device.name, underlying: nil))
                 }
             }
         }
@@ -565,7 +594,18 @@ class Conductor: ObservableObject {
         
         DispatchQueue.main.async {
             self.audioLatency = estimatedLatency
+            
+            // Check for high latency and warn user
+            if estimatedLatency > 0.050 { // 50ms threshold
+                self.errorPresenter?.presentError(.audioLatencyTooHigh(latency: estimatedLatency))
+            }
         }
+    }
+    
+    // MARK: - Error Handling Setup
+    
+    func setErrorPresenter(_ presenter: ErrorPresenter) {
+        self.errorPresenter = presenter
     }
     
     // MARK: - Scoring Session Management
@@ -613,6 +653,7 @@ class Conductor: ObservableObject {
             try metronome.loadAudioFiles(metronomeFiles)
         } catch {
             Log("Could not load metronome audio files: \(error)")
+            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
         }
     }
     
@@ -621,7 +662,13 @@ class Conductor: ObservableObject {
         // This is a fallback - in production, you'd have actual audio files
         
         let sampleRate = 44100.0
-        let duration = 0.1 // 100ms click
+        let duration: Double = {
+            switch sound {
+            case .soft, .vintage: return 0.15 // Longer, softer sounds
+            case .sharp, .digital: return 0.05 // Short, sharp sounds
+            default: return 0.1 // Standard duration
+            }
+        }()
         let frameCount = AVAudioFrameCount(sampleRate * duration)
         
         guard let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1) else {
@@ -634,24 +681,22 @@ class Conductor: ObservableObject {
         
         buffer.frameLength = frameCount
         
-        // Generate a simple click sound based on the sound type
-        let frequency: Float = {
-            switch sound {
-            case .click: return 1000.0
-            case .beep: return 800.0
-            case .tick: return 1200.0
-            case .wood: return 600.0
-            case .digital: return 1500.0
-            case .cowbell: return 900.0
-            }
-        }()
+        // Generate enhanced metronome sounds with more variety
+        let (frequency, waveform, envelope) = getMetronomeSoundParameters(for: sound)
         
         guard let channelData = buffer.floatChannelData?[0] else { return nil }
         
         for i in 0..<Int(frameCount) {
             let time = Float(i) / Float(sampleRate)
-            let amplitude = exp(-time * 10.0) // Exponential decay
-            channelData[i] = amplitude * sin(2.0 * .pi * frequency * time)
+            let normalizedTime = time / Float(duration)
+            
+            // Apply envelope
+            let amplitude = envelope(normalizedTime)
+            
+            // Generate waveform
+            let sample = waveform(frequency, time) * amplitude
+            
+            channelData[i] = sample
         }
         
         // Create temporary file
@@ -663,7 +708,87 @@ class Conductor: ObservableObject {
             return try AKAudioFile(forReading: tempURL)
         } catch {
             Log("Could not create synthetic metronome sound: \(error)")
+            // Don't present error for synthetic sound creation failure - it's a fallback
             return nil
+        }
+    }
+    
+    private func getMetronomeSoundParameters(for sound: MetronomeSound) -> (Float, (Float, Float) -> Float, (Float) -> Float) {
+        switch sound {
+        case .click:
+            return (1000.0, { freq, time in sin(2.0 * .pi * freq * time) }, { t in exp(-t * 10.0) })
+        case .beep:
+            return (800.0, { freq, time in sin(2.0 * .pi * freq * time) }, { t in exp(-t * 8.0) })
+        case .tick:
+            return (1200.0, { freq, time in sin(2.0 * .pi * freq * time) }, { t in exp(-t * 15.0) })
+        case .wood:
+            return (600.0, { freq, time in 
+                let fundamental = sin(2.0 * .pi * freq * time)
+                let harmonic = 0.3 * sin(2.0 * .pi * freq * 2.0 * time)
+                return fundamental + harmonic
+            }, { t in exp(-t * 12.0) })
+        case .digital:
+            return (1500.0, { freq, time in 
+                sin(2.0 * .pi * freq * time) > 0 ? 0.8 : -0.8 // Square wave
+            }, { t in exp(-t * 20.0) })
+        case .cowbell:
+            return (900.0, { freq, time in 
+                let f1 = sin(2.0 * .pi * freq * time)
+                let f2 = 0.5 * sin(2.0 * .pi * freq * 1.5 * time)
+                return f1 + f2
+            }, { t in exp(-t * 6.0) })
+        case .rimshot:
+            return (2000.0, { freq, time in 
+                let noise = Float.random(in: -0.3...0.3)
+                let tone = 0.7 * sin(2.0 * .pi * freq * time)
+                return tone + noise
+            }, { t in exp(-t * 25.0) })
+        case .clap:
+            return (1800.0, { _, _ in Float.random(in: -1.0...1.0) }, { t in 
+                t < 0.1 ? 1.0 : exp(-(t - 0.1) * 30.0)
+            })
+        case .hihat:
+            return (8000.0, { _, _ in Float.random(in: -0.8...0.8) }, { t in exp(-t * 40.0) })
+        case .shaker:
+            return (6000.0, { _, _ in Float.random(in: -0.6...0.6) }, { t in 
+                let envelope = exp(-t * 8.0)
+                let tremolo = 1.0 + 0.3 * sin(2.0 * .pi * 20.0 * t)
+                return envelope * tremolo
+            })
+        case .triangle:
+            return (1100.0, { freq, time in 
+                let phase = fmod(freq * time, 1.0)
+                return phase < 0.5 ? (4.0 * phase - 1.0) : (3.0 - 4.0 * phase)
+            }, { t in exp(-t * 5.0) })
+        case .bell:
+            return (1400.0, { freq, time in 
+                let f1 = sin(2.0 * .pi * freq * time)
+                let f2 = 0.4 * sin(2.0 * .pi * freq * 2.76 * time)
+                let f3 = 0.2 * sin(2.0 * .pi * freq * 5.4 * time)
+                return f1 + f2 + f3
+            }, { t in exp(-t * 3.0) })
+        case .vintage:
+            return (700.0, { freq, time in 
+                let fundamental = sin(2.0 * .pi * freq * time)
+                let warmth = 0.2 * sin(2.0 * .pi * freq * 0.5 * time)
+                return fundamental + warmth
+            }, { t in exp(-t * 4.0) })
+        case .modern:
+            return (1300.0, { freq, time in 
+                let clean = sin(2.0 * .pi * freq * time)
+                let bright = 0.3 * sin(2.0 * .pi * freq * 3.0 * time)
+                return clean + bright
+            }, { t in exp(-t * 18.0) })
+        case .soft:
+            return (500.0, { freq, time in 
+                sin(2.0 * .pi * freq * time) * (1.0 - 0.3 * sin(2.0 * .pi * 5.0 * time))
+            }, { t in exp(-t * 3.0) })
+        case .sharp:
+            return (2500.0, { freq, time in 
+                let sharp = sin(2.0 * .pi * freq * time)
+                let attack = sin(2.0 * .pi * freq * 4.0 * time) * exp(-time * 50.0)
+                return sharp + 0.5 * attack
+            }, { t in exp(-t * 30.0) })
         }
     }
     

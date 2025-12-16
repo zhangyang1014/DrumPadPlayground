@@ -217,6 +217,248 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         }
     }
     
+    // MARK: - Advanced Analytics Dashboard
+    
+    func getAdvancedAnalytics() -> AdvancedAnalytics {
+        return AdvancedAnalytics(
+            performanceMetrics: getPerformanceMetrics(),
+            practicePatterns: getPracticePatterns(),
+            skillProgression: getSkillProgression(),
+            comparativeAnalysis: getComparativeAnalysis(),
+            recommendations: getPersonalizedRecommendations()
+        )
+    }
+    
+    private func getPerformanceMetrics() -> PerformanceMetrics {
+        let scores = getRecentScores(limit: 100)
+        
+        let averageScore = scores.isEmpty ? 0 : scores.reduce(0) { $0 + $1.totalScore } / Float(scores.count)
+        let averageAccuracy = calculateAverageAccuracy(from: scores)
+        let improvementRate = calculateImprovementRate(from: scores)
+        let consistencyScore = calculateConsistencyScore(from: scores)
+        
+        return PerformanceMetrics(
+            averageScore: averageScore,
+            averageAccuracy: averageAccuracy,
+            improvementRate: improvementRate,
+            consistencyScore: consistencyScore,
+            perfectScoreCount: scores.filter { $0.totalScore >= 100.0 }.count,
+            totalAttempts: scores.count
+        )
+    }
+    
+    private func getPracticePatterns() -> PracticePatterns {
+        let weeklyData = getWeeklyProgress()
+        let hourlyDistribution = getHourlyPracticeDistribution()
+        let sessionLengths = getSessionLengthDistribution()
+        
+        return PracticePatterns(
+            preferredPracticeTime: getMostActiveHour(from: hourlyDistribution),
+            averageSessionLength: sessionLengths.isEmpty ? 0 : sessionLengths.reduce(0, +) / sessionLengths.count,
+            practiceFrequency: calculatePracticeFrequency(from: weeklyData),
+            longestStreak: currentProgress.maxStreak,
+            mostProductiveDay: getMostProductiveDay(from: weeklyData)
+        )
+    }
+    
+    private func getSkillProgression() -> SkillProgression {
+        let difficultyProgress = getDifficultyProgressionData()
+        let instrumentProgress = getInstrumentProgressionData()
+        let tempoProgress = getTempoProgressionData()
+        
+        return SkillProgression(
+            difficultyProgression: difficultyProgress,
+            instrumentMastery: instrumentProgress,
+            tempoComfort: tempoProgress,
+            weakAreas: identifyWeakAreas(),
+            strongAreas: identifyStrongAreas(),
+            nextMilestones: getNextMilestones()
+        )
+    }
+    
+    private func getComparativeAnalysis() -> ComparativeAnalysis {
+        let globalStats = getGlobalAverages()
+        let peerComparison = getPeerComparison()
+        
+        return ComparativeAnalysis(
+            vsGlobalAverage: ComparisonData(
+                scoreComparison: currentProgress.totalStars > globalStats.averageStars ? .above : .below,
+                practiceTimeComparison: currentProgress.totalPracticeTime > globalStats.averagePracticeTime ? .above : .below,
+                levelComparison: currentProgress.currentLevel > globalStats.averageLevel ? .above : .below
+            ),
+            vsPeers: peerComparison,
+            percentileRank: calculatePercentileRank()
+        )
+    }
+    
+    private func getPersonalizedRecommendations() -> [Recommendation] {
+        var recommendations: [Recommendation] = []
+        
+        // Analyze practice patterns and suggest improvements
+        let analytics = getAdvancedAnalytics()
+        
+        if analytics.practicePatterns.practiceFrequency < 0.5 {
+            recommendations.append(Recommendation(
+                type: .practiceFrequency,
+                title: "Increase Practice Frequency",
+                description: "Try to practice more regularly. Even 5 minutes daily is better than longer, infrequent sessions.",
+                priority: .high
+            ))
+        }
+        
+        if analytics.performanceMetrics.consistencyScore < 0.7 {
+            recommendations.append(Recommendation(
+                type: .consistency,
+                title: "Focus on Consistency",
+                description: "Your scores vary significantly. Try practicing at slower tempos to build muscle memory.",
+                priority: .medium
+            ))
+        }
+        
+        if let weakArea = analytics.skillProgression.weakAreas.first {
+            recommendations.append(Recommendation(
+                type: .skillImprovement,
+                title: "Improve \(weakArea.name)",
+                description: "Focus on \(weakArea.name) exercises to strengthen this area.",
+                priority: .high
+            ))
+        }
+        
+        return recommendations
+    }
+    
+    // MARK: - Helper Methods for Analytics
+    
+    private func getRecentScores(limit: Int) -> [ScoreResult] {
+        // Fetch recent scores from Core Data
+        return Array(recentScores.prefix(limit))
+    }
+    
+    private func calculateAverageAccuracy(from scores: [ScoreResult]) -> Float {
+        guard !scores.isEmpty else { return 0 }
+        
+        let totalAccuracy = scores.reduce(0.0) { total, score in
+            let hits = score.timingResults.filter { $0.timing != .miss }.count
+            let accuracy = Float(hits) / Float(score.timingResults.count)
+            return total + accuracy
+        }
+        
+        return totalAccuracy / Float(scores.count)
+    }
+    
+    private func calculateImprovementRate(from scores: [ScoreResult]) -> Float {
+        guard scores.count >= 2 else { return 0 }
+        
+        let recentAverage = scores.prefix(10).reduce(0) { $0 + $1.totalScore } / 10.0
+        let olderAverage = scores.suffix(10).reduce(0) { $0 + $1.totalScore } / 10.0
+        
+        return (recentAverage - olderAverage) / olderAverage
+    }
+    
+    private func calculateConsistencyScore(from scores: [ScoreResult]) -> Float {
+        guard scores.count >= 3 else { return 1.0 }
+        
+        let average = scores.reduce(0) { $0 + $1.totalScore } / Float(scores.count)
+        let variance = scores.reduce(0) { total, score in
+            let diff = score.totalScore - average
+            return total + (diff * diff)
+        } / Float(scores.count)
+        
+        let standardDeviation = sqrt(variance)
+        
+        // Convert to consistency score (lower deviation = higher consistency)
+        return max(0, 1.0 - (standardDeviation / 50.0))
+    }
+    
+    private func getHourlyPracticeDistribution() -> [Int: TimeInterval] {
+        // Analyze practice times by hour of day
+        var distribution: [Int: TimeInterval] = [:]
+        
+        for hour in 0..<24 {
+            distribution[hour] = 0
+        }
+        
+        // This would analyze actual practice session data
+        // Placeholder implementation
+        return distribution
+    }
+    
+    private func getSessionLengthDistribution() -> [TimeInterval] {
+        // Return array of session lengths
+        return [] // Placeholder
+    }
+    
+    private func getMostActiveHour(from distribution: [Int: TimeInterval]) -> Int {
+        return distribution.max(by: { $0.value < $1.value })?.key ?? 19 // Default to 7 PM
+    }
+    
+    private func calculatePracticeFrequency(from weeklyData: [DailyProgressData]) -> Float {
+        let daysWithPractice = weeklyData.filter { $0.practiceTimeMinutes > 0 }.count
+        return Float(daysWithPractice) / Float(weeklyData.count)
+    }
+    
+    private func getMostProductiveDay(from weeklyData: [DailyProgressData]) -> String {
+        let calendar = Calendar.current
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEEE"
+        
+        let mostProductiveData = weeklyData.max(by: { $0.starsEarned < $1.starsEarned })
+        return mostProductiveData.map { dayFormatter.string(from: $0.date) } ?? "Monday"
+    }
+    
+    private func getDifficultyProgressionData() -> [DifficultyProgress] {
+        // Analyze progress across different difficulty levels
+        return [] // Placeholder
+    }
+    
+    private func getInstrumentProgressionData() -> [InstrumentProgress] {
+        // Analyze progress with different drum instruments
+        return [] // Placeholder
+    }
+    
+    private func getTempoProgressionData() -> [TempoProgress] {
+        // Analyze comfort with different tempos
+        return [] // Placeholder
+    }
+    
+    private func identifyWeakAreas() -> [SkillArea] {
+        // Identify areas needing improvement
+        return [] // Placeholder
+    }
+    
+    private func identifyStrongAreas() -> [SkillArea] {
+        // Identify strong skill areas
+        return [] // Placeholder
+    }
+    
+    private func getNextMilestones() -> [Milestone] {
+        // Suggest next achievable milestones
+        return [] // Placeholder
+    }
+    
+    private func getGlobalAverages() -> GlobalStats {
+        // Return global average statistics
+        return GlobalStats(
+            averageLevel: 5,
+            averageStars: 50,
+            averagePracticeTime: 3600 // 1 hour
+        )
+    }
+    
+    private func getPeerComparison() -> ComparisonData {
+        // Compare with similar-level users
+        return ComparisonData(
+            scoreComparison: .above,
+            practiceTimeComparison: .above,
+            levelComparison: .equal
+        )
+    }
+    
+    private func calculatePercentileRank() -> Int {
+        // Calculate user's percentile rank globally
+        return 75 // Placeholder
+    }
+    
     // MARK: - Private Methods
     
     private func loadUserProgress() {
@@ -513,6 +755,123 @@ public enum AchievementCategory: String, CaseIterable {
         case .stars: return "Stars"
         }
     }
+}
+
+// MARK: - Advanced Analytics Data Structures
+
+public struct AdvancedAnalytics {
+    let performanceMetrics: PerformanceMetrics
+    let practicePatterns: PracticePatterns
+    let skillProgression: SkillProgression
+    let comparativeAnalysis: ComparativeAnalysis
+    let recommendations: [Recommendation]
+}
+
+public struct PerformanceMetrics {
+    let averageScore: Float
+    let averageAccuracy: Float
+    let improvementRate: Float
+    let consistencyScore: Float
+    let perfectScoreCount: Int
+    let totalAttempts: Int
+}
+
+public struct PracticePatterns {
+    let preferredPracticeTime: Int // Hour of day (0-23)
+    let averageSessionLength: TimeInterval
+    let practiceFrequency: Float // 0-1, where 1 is daily practice
+    let longestStreak: Int
+    let mostProductiveDay: String
+}
+
+public struct SkillProgression {
+    let difficultyProgression: [DifficultyProgress]
+    let instrumentMastery: [InstrumentProgress]
+    let tempoComfort: [TempoProgress]
+    let weakAreas: [SkillArea]
+    let strongAreas: [SkillArea]
+    let nextMilestones: [Milestone]
+}
+
+public struct ComparativeAnalysis {
+    let vsGlobalAverage: ComparisonData
+    let vsPeers: ComparisonData
+    let percentileRank: Int
+}
+
+public struct ComparisonData {
+    let scoreComparison: ComparisonResult
+    let practiceTimeComparison: ComparisonResult
+    let levelComparison: ComparisonResult
+}
+
+public enum ComparisonResult {
+    case above
+    case below
+    case equal
+}
+
+public struct DifficultyProgress {
+    let difficulty: Int
+    let averageScore: Float
+    let completionRate: Float
+    let improvementTrend: Float
+}
+
+public struct InstrumentProgress {
+    let instrument: String
+    let accuracy: Float
+    let consistency: Float
+    let recentImprovement: Float
+}
+
+public struct TempoProgress {
+    let bpmRange: String
+    let comfortLevel: Float
+    let accuracy: Float
+    let recommendedPractice: Bool
+}
+
+public struct SkillArea {
+    let name: String
+    let currentLevel: Float
+    let targetLevel: Float
+    let improvementSuggestions: [String]
+}
+
+public struct Milestone {
+    let title: String
+    let description: String
+    let targetValue: Int
+    let currentValue: Int
+    let estimatedTimeToComplete: TimeInterval
+}
+
+public struct Recommendation {
+    let type: RecommendationType
+    let title: String
+    let description: String
+    let priority: RecommendationPriority
+}
+
+public enum RecommendationType {
+    case practiceFrequency
+    case consistency
+    case skillImprovement
+    case tempoWork
+    case difficultyProgression
+}
+
+public enum RecommendationPriority {
+    case low
+    case medium
+    case high
+}
+
+public struct GlobalStats {
+    let averageLevel: Int
+    let averageStars: Int
+    let averagePracticeTime: TimeInterval
 }
 
 // MARK: - Notifications

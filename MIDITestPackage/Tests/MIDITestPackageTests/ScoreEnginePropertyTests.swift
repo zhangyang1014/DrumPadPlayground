@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import MIDITestPackage
 @testable import MIDITestPackage
 
 // MARK: - Test Data Generators
@@ -13,7 +14,7 @@ struct ScoreEngineTestGenerators {
             timestamp: TimeInterval.random(in: timestampRange),
             noteNumber: Int.random(in: noteRange),
             velocity: Int.random(in: velocityRange),
-            channel: Int.random(in: 0...15)
+            isNoteOn: true
         )
     }
     
@@ -70,7 +71,7 @@ struct ScoreEngineTestGenerators {
                 timestamp: target.timestamp,
                 noteNumber: target.noteNumber,
                 velocity: target.velocity ?? 100,
-                channel: 0
+                isNoteOn: true
             )
         }
     }
@@ -82,7 +83,7 @@ struct ScoreEngineTestGenerators {
                 timestamp: target.timestamp + timingOffset,
                 noteNumber: target.noteNumber,
                 velocity: target.velocity ?? 100,
-                channel: 0
+                isNoteOn: true
             )
         }
     }
@@ -111,7 +112,7 @@ struct ScoreEnginePropertyTests {
                 timestamp: targetEvent.timestamp,
                 noteNumber: targetEvent.noteNumber,
                 velocity: 100,
-                channel: 0
+                isNoteOn: true
             )
             let perfectFeedback = scoreEngine.getTimingFeedback(for: perfectEvent)
             #expect(perfectFeedback == .perfect, "Perfect timing should be classified as perfect")
@@ -122,7 +123,7 @@ struct ScoreEnginePropertyTests {
                 timestamp: targetEvent.timestamp + earlyOffset,
                 noteNumber: targetEvent.noteNumber,
                 velocity: 100,
-                channel: 0
+                isNoteOn: true
             )
             let earlyFeedback = scoreEngine.getTimingFeedback(for: earlyEvent)
             if abs(earlyOffset) <= profile.earlyWindow {
@@ -137,7 +138,7 @@ struct ScoreEnginePropertyTests {
                 timestamp: targetEvent.timestamp + lateOffset,
                 noteNumber: targetEvent.noteNumber,
                 velocity: 100,
-                channel: 0
+                isNoteOn: true
             )
             let lateFeedback = scoreEngine.getTimingFeedback(for: lateEvent)
             if abs(lateOffset) <= profile.lateWindow {
@@ -211,7 +212,7 @@ struct ScoreEnginePropertyTests {
                     timestamp: target.timestamp,
                     noteNumber: target.noteNumber,
                     velocity: 100,
-                    channel: 0
+                    isNoteOn: true
                 )
                 
                 scoreEngine.processUserInput(perfectInput, at: perfectInput.timestamp)
@@ -252,7 +253,7 @@ struct ScoreEnginePropertyTests {
                     timestamp: target.timestamp,
                     noteNumber: target.noteNumber,
                     velocity: 100,
-                    channel: 0
+                    isNoteOn: true
                 )
                 scoreEngine.processUserInput(perfectInput, at: perfectInput.timestamp)
             }
@@ -266,7 +267,7 @@ struct ScoreEnginePropertyTests {
                     timestamp: TimeInterval(i) * 0.1,
                     noteNumber: 999, // Invalid note that won't match any target
                     velocity: 100,
-                    channel: 0
+                    isNoteOn: true
                 )
                 scoreEngine.processUserInput(extraInput, at: extraInput.timestamp)
             }
