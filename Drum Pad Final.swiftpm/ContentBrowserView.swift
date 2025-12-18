@@ -56,14 +56,14 @@ struct ContentBrowserHeader: View {
                     FilterPicker(
                         title: "Type",
                         selection: $viewModel.selectedContentType,
-                        options: ContentType.allCases
+                        options: ContentType.self
                     )
                     
                     // Difficulty filter
                     FilterPicker(
                         title: "Difficulty",
                         selection: $viewModel.selectedDifficulty,
-                        options: DifficultyLevel.allCases
+                        options: DifficultyLevel.self
                     )
                     
                     // Tag filter
@@ -217,7 +217,7 @@ struct ContentListView: View {
     var body: some View {
         Group {
             if viewModel.isLoading {
-                ProgressView("Loading content...")
+                SwiftUI.ProgressView("Loading content...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if viewModel.filteredContent.isEmpty {
                 ContentEmptyState(

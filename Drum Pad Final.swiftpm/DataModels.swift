@@ -116,7 +116,8 @@ public class LessonStep: NSManagedObject, Identifiable {
     // Relationships
     @NSManaged public var lesson: Lesson?
     
-    public var targetEvents: [TargetEvent] {
+    // 使用内部类型 TargetEvent，保持 internal 访问级别
+    var targetEvents: [TargetEvent] {
         get {
             guard let events = try? JSONDecoder().decode([TargetEvent].self, from: targetEventsData) else {
                 return []
@@ -165,7 +166,8 @@ public class ScoreResultEntity: NSManagedObject, Identifiable {
     @NSManaged public var lesson: Lesson?
     @NSManaged public var userProgress: UserProgress?
     
-    public var timingResults: [TimingResult] {
+    // internal 因为 TimingResult 为 internal 类型
+    var timingResults: [TimingResult] {
         get {
             guard let results = try? JSONDecoder().decode([TimingResult].self, from: timingResultsData) else {
                 return []
@@ -189,7 +191,7 @@ public class ScoreResultEntity: NSManagedObject, Identifiable {
     }
     
     // Convert to ScoreResult struct
-    public func toScoreResult() -> ScoreResult {
+    func toScoreResult() -> ScoreResult {
         return ScoreResult(
             totalScore: totalScore,
             starRating: Int(starRating),
@@ -272,8 +274,8 @@ public class ScoringProfileEntity: NSManagedObject {
     // Relationships
     @NSManaged public var lessons: NSSet?
     
-    // Convert to ScoringProfile struct
-    public func toScoringProfile() -> ScoringProfile {
+    // Convert to ScoringProfile struct（internal，因 ScoringProfile 为 internal）
+    func toScoringProfile() -> ScoringProfile {
         return ScoringProfile(
             perfectWindow: perfectWindow,
             earlyWindow: earlyWindow,
@@ -325,6 +327,20 @@ public class AudioAssetsEntity: NSManagedObject {
 }
 
 // MARK: - Supporting Structs
+
+public struct AudioAssets {
+    public let backingTrackURL: URL?
+    public let clickTrackURL: URL?
+    public let previewURL: URL?
+    public let stemURLs: [String: URL]
+    
+    public init(backingTrackURL: URL?, clickTrackURL: URL?, previewURL: URL?, stemURLs: [String: URL]) {
+        self.backingTrackURL = backingTrackURL
+        self.clickTrackURL = clickTrackURL
+        self.previewURL = previewURL
+        self.stemURLs = stemURLs
+    }
+}
 
 public struct TimeSignature: Codable {
     public let numerator: Int

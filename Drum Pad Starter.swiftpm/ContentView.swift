@@ -51,7 +51,7 @@ struct ContentView: View {
                             .foregroundColor( Color("textColor1"))
                             .font(Font.system(size: 18))
                         Button(action: {
-                            openURL(URL(string: "https://audiokitpro.com/drumpadplayground/")!)
+                            openURL(URL(string: "http://bugelife.com/fingerdrumhero")!)
                         }) {
                             Text("WATCH TUTORIAL")
                                 .foregroundColor(Color("textColor1"))

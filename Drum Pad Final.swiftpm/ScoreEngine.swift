@@ -1,5 +1,6 @@
 import Foundation
 import AudioKit
+import QuartzCore // for CACurrentMediaTime
 
 // MARK: - Scoring Data Models
 
@@ -17,6 +18,15 @@ struct MIDIEvent: Codable {
     let noteNumber: Int
     let velocity: Int
     let channel: Int
+    let duration: TimeInterval?
+    
+    init(timestamp: TimeInterval, noteNumber: Int, velocity: Int, channel: Int, duration: TimeInterval? = nil) {
+        self.timestamp = timestamp
+        self.noteNumber = noteNumber
+        self.velocity = velocity
+        self.channel = channel
+        self.duration = duration
+    }
 }
 
 enum TimingFeedback: String, Codable, CaseIterable {
@@ -116,9 +126,9 @@ class ScoreEngine: ObservableObject, ScoreEngineProtocol {
     @Published var isScoring: Bool = false
     
     // MARK: - Private Properties
-    private var targetEvents: [TargetEvent] = []
+    internal var targetEvents: [TargetEvent] = []
     private var userEvents: [MIDIEvent] = []
-    private var timingResults: [TimingResult] = []
+    internal var timingResults: [TimingResult] = []
     private var scoringProfile: ScoringProfile = ScoringProfile.defaultProfile()
     
     // Scoring state

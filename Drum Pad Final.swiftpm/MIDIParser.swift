@@ -282,8 +282,8 @@ class MIDIParser: ObservableObject {
         return (tempoEvents, timeSignatureEvents)
     }
     
-    private func extractDrumEvents(from tracks: [MIDITrack], timeDivision: Int) -> [MIDIEvent] {
-        var drumEvents: [MIDIEvent] = []
+    private func extractDrumEvents(from tracks: [MIDITrack], timeDivision: Int) -> [ParsedMIDIEvent] {
+        var drumEvents: [ParsedMIDIEvent] = []
         
         for track in tracks {
             var activeNotes: [UInt8: (timestamp: Double, velocity: Int)] = [:]
@@ -301,7 +301,7 @@ class MIDIParser: ObservableObject {
                 case .noteOff(let channel, let note, _):
                     if channel == 9, let activeNote = activeNotes.removeValue(forKey: note) {
                         let duration = timestamp - activeNote.timestamp
-                        drumEvents.append(MIDIEvent(
+                        drumEvents.append(ParsedMIDIEvent(
                             timestamp: activeNote.timestamp,
                             noteNumber: Int(note),
                             velocity: activeNote.velocity,
@@ -316,7 +316,7 @@ class MIDIParser: ObservableObject {
             
             // Handle any remaining active notes (treat as short notes)
             for (note, activeNote) in activeNotes {
-                drumEvents.append(MIDIEvent(
+                drumEvents.append(ParsedMIDIEvent(
                     timestamp: activeNote.timestamp,
                     noteNumber: Int(note),
                     velocity: activeNote.velocity,
@@ -338,7 +338,7 @@ class MIDIParser: ObservableObject {
         return Double(ticks) * secondsPerTick
     }
     
-    private func calculateTotalDuration(_ events: [MIDIEvent]) -> TimeInterval {
+    private func calculateTotalDuration(_ events: [ParsedMIDIEvent]) -> TimeInterval {
         guard let lastEvent = events.last else { return 0 }
         
         let lastEventEnd = lastEvent.timestamp + (lastEvent.duration ?? 0.1)
@@ -368,8 +368,8 @@ class MIDIParser: ObservableObject {
         )
     }
     
-    private func removeDuplicateEvents(_ events: [MIDIEvent]) -> [MIDIEvent] {
-        var filteredEvents: [MIDIEvent] = []
+    private func removeDuplicateEvents(_ events: [ParsedMIDIEvent]) -> [ParsedMIDIEvent] {
+        var filteredEvents: [ParsedMIDIEvent] = []
         let timeThreshold: Double = 0.01 // 10ms threshold
         
         for event in events {
@@ -386,13 +386,13 @@ class MIDIParser: ObservableObject {
         return filteredEvents
     }
     
-    private func quantizeEvents(_ events: [MIDIEvent], timeDivision: Int) -> [MIDIEvent] {
+    private func quantizeEvents(_ events: [ParsedMIDIEvent], timeDivision: Int) -> [ParsedMIDIEvent] {
         // Optional quantization to nearest 16th note
         let quantizeGrid: Double = 0.125 // 16th note at 120 BPM
         
         return events.map { event in
             let quantizedTime = round(event.timestamp / quantizeGrid) * quantizeGrid
-            return MIDIEvent(
+            return ParsedMIDIEvent(
                 timestamp: max(0, quantizedTime),
                 noteNumber: event.noteNumber,
                 velocity: event.velocity,
@@ -409,11 +409,37 @@ struct MIDIData {
     let trackCount: Int
     let timeDivision: Int
     let tracks: [MIDITrack]
-    let drumEvents: [MIDIEvent]
+    let drumEvents: [ParsedMIDIEvent]
     let tempoEvents: [TempoEvent]
     let timeSignatureEvents: [TimeSignatureEvent]
     let totalDuration: TimeInterval
     let timeSignature: TimeSignature
+    
+    // 完整初始化器
+    init(formatType: Int, trackCount: Int, timeDivision: Int, tracks: [MIDITrack], drumEvents: [ParsedMIDIEvent], tempoEvents: [TempoEvent], timeSignatureEvents: [TimeSignatureEvent], totalDuration: TimeInterval, timeSignature: TimeSignature) {
+        self.formatType = formatType
+        self.trackCount = trackCount
+        self.timeDivision = timeDivision
+        self.tracks = tracks
+        self.drumEvents = drumEvents
+        self.tempoEvents = tempoEvents
+        self.timeSignatureEvents = timeSignatureEvents
+        self.totalDuration = totalDuration
+        self.timeSignature = timeSignature
+    }
+    
+    // 简化初始化器 - 用于 ContentManager 等需要快速创建 MIDIData 的场景
+    init(drumEvents: [ParsedMIDIEvent], tempoEvents: [TempoEvent], timeSignature: TimeSignature, totalDuration: TimeInterval) {
+        self.formatType = 0
+        self.trackCount = 1
+        self.timeDivision = 480
+        self.tracks = []
+        self.drumEvents = drumEvents
+        self.tempoEvents = tempoEvents
+        self.timeSignatureEvents = [TimeSignatureEvent(timestamp: 0, timeSignature: timeSignature)]
+        self.totalDuration = totalDuration
+        self.timeSignature = timeSignature
+    }
 }
 
 struct MIDITrack {
@@ -433,7 +459,8 @@ enum MIDIEventType {
     case unknown
 }
 
-struct MIDIEvent {
+// 重命名为 ParsedMIDIEvent 以避免与 ScoreEngine.swift 中的 MIDIEvent 冲突
+struct ParsedMIDIEvent {
     let timestamp: TimeInterval
     let noteNumber: Int
     let velocity: Int

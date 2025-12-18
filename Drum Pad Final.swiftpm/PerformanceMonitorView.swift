@@ -284,7 +284,7 @@ struct PerformanceChartsSection: View {
                 VStack(spacing: 20) {
                     // Audio Latency Chart
                     ChartCard(title: "Audio Latency", unit: "ms") {
-                        Chart(filteredMetrics) { metrics in
+                        Chart(filteredMetrics, id: \.timestamp) { metrics in
                             LineMark(
                                 x: .value("Time", metrics.timestamp),
                                 y: .value("Latency", metrics.audioLatency * 1000)
@@ -299,7 +299,7 @@ struct PerformanceChartsSection: View {
                     
                     // CPU Usage Chart
                     ChartCard(title: "CPU Usage", unit: "%") {
-                        Chart(filteredMetrics) { metrics in
+                        Chart(filteredMetrics, id: \.timestamp) { metrics in
                             LineMark(
                                 x: .value("Time", metrics.timestamp),
                                 y: .value("CPU", metrics.cpuUsage)
@@ -314,7 +314,7 @@ struct PerformanceChartsSection: View {
                     
                     // Performance Score Chart
                     ChartCard(title: "Performance Score", unit: "/100") {
-                        Chart(filteredMetrics) { metrics in
+                        Chart(filteredMetrics, id: \.timestamp) { metrics in
                             LineMark(
                                 x: .value("Time", metrics.timestamp),
                                 y: .value("Score", metrics.performanceScore)
@@ -328,11 +328,27 @@ struct PerformanceChartsSection: View {
                     }
                 }
             } else {
-                ContentUnavailableView(
-                    "No Performance Data",
-                    systemImage: "chart.line.uptrend.xyaxis",
-                    description: Text("Performance monitoring data will appear here once monitoring is active.")
-                )
+                if #available(iOS 17, *) {
+                    ContentUnavailableView(
+                        "No Performance Data",
+                        systemImage: "chart.line.uptrend.xyaxis",
+                        description: Text("Performance monitoring data will appear here once monitoring is active.")
+                    )
+                } else {
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No Performance Data")
+                            .font(.headline)
+                        Text("Performance monitoring data will appear here once monitoring is active.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+                }
             }
         }
     }

@@ -1,5 +1,9 @@
 # Changelog
 
+| 版本 | 日期 | 变更内容 | 变更人 |
+| --- | --- | --- | --- |
+| v1.0.1 | 2025-12-17 | 更新最低平台要求为 iOS 16.0/iPadOS 16.0 | 大象 |
+
 All notable changes to Melodic Drum Trainer will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
@@ -72,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integration tests for end-to-end workflows
 
 ### Technical Details
-- **Platform**: iOS 15.2+, iPadOS 15.2+
+- **Platform**: iOS 16.0+, iPadOS 16.0+
 - **Framework**: SwiftUI with AudioKit 5.x
 - **Architecture**: MVVM with modular component design
 - **Testing**: Swift Testing Framework with property-based testing
@@ -162,4 +166,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 For technical support, bug reports, or feature requests:
 - **GitHub Issues**: [Report bugs and request features](https://github.com/audiokit/melodic-drum-trainer/issues)
 - **Documentation**: See `Documentation/USER_MANUAL.md` for detailed usage instructions
-- **Email**: [support@melodicdrumtrainer.com](mailto:support@melodicdrumtrainer.com)
+- **Email**: [apple@bugelife.com](mailto:apple@bugelife.com)

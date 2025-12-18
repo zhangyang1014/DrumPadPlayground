@@ -1,5 +1,9 @@
 # Melodic Drum Trainer - User Manual
 
+| 版本 | 日期 | 变更内容 | 变更人 |
+| --- | --- | --- | --- |
+| v1.0.1 | 2025-12-17 | 系统要求更新至 iOS 16.0/iPadOS 16.0 | 大象 |
+
 ## Table of Contents
 1. [Getting Started](#getting-started)
 2. [MIDI Device Setup](#midi-device-setup)
@@ -20,8 +24,8 @@ Welcome to Melodic Drum Trainer, an interactive drum practice application design
 4. Complete the initial setup wizard
 
 ### System Requirements
-- iOS 15.2 or later
-- iPadOS 15.2 or later
+- iOS 16.0 or later
+- iPadOS 16.0 or later
 - Compatible MIDI drum device (recommended)
 - Wired headphones or speakers for best audio experience
 

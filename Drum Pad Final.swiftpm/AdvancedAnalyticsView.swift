@@ -77,28 +77,28 @@ struct AdvancedAnalyticsView: View {
                 .fontWeight(.semibold)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 16) {
-                MetricCard(
+                AnalyticsMetricCard(
                     title: "Average Score",
                     value: String(format: "%.1f%%", analytics.performanceMetrics.averageScore),
                     trend: analytics.performanceMetrics.improvementRate > 0 ? .up : .down,
                     color: .blue
                 )
                 
-                MetricCard(
+                AnalyticsMetricCard(
                     title: "Consistency",
                     value: String(format: "%.1f%%", analytics.performanceMetrics.consistencyScore * 100),
                     trend: .stable,
                     color: .green
                 )
                 
-                MetricCard(
+                AnalyticsMetricCard(
                     title: "Practice Frequency",
                     value: String(format: "%.1f%%", analytics.practicePatterns.practiceFrequency * 100),
                     trend: .up,
                     color: .orange
                 )
                 
-                MetricCard(
+                AnalyticsMetricCard(
                     title: "Perfect Scores",
                     value: "\(analytics.performanceMetrics.perfectScoreCount)",
                     trend: .up,
@@ -109,8 +109,6 @@ struct AdvancedAnalyticsView: View {
     }
     
     private var performanceChartsSection: some View {
-        let analytics = progressManager.getAdvancedAnalytics()
-        
         return VStack(alignment: .leading, spacing: 16) {
             Text("Performance Trends")
                 .font(.headline)
@@ -191,6 +189,7 @@ struct AdvancedAnalyticsView: View {
     
     private var skillProgressionSection: some View {
         let analytics = progressManager.getAdvancedAnalytics()
+        let difficultyLevels: [Int] = Array(1...5)
         
         return VStack(alignment: .leading, spacing: 16) {
             Text("Skill Progression")
@@ -203,13 +202,13 @@ struct AdvancedAnalyticsView: View {
                     .font(.subheadline)
                     .fontWeight(.medium)
                 
-                ForEach(1...5, id: \.self) { difficulty in
+                ForEach(difficultyLevels, id: \.self) { (difficulty: Int) in
                     HStack {
                         Text("Level \(difficulty)")
                             .font(.caption)
                             .frame(width: 60, alignment: .leading)
                         
-                        ProgressView(value: Double.random(in: 0...1))
+                        SwiftUI.ProgressView(value: Double.random(in: 0...1))
                             .progressViewStyle(LinearProgressViewStyle(tint: difficultyColor(difficulty)))
                         
                         Text("\(Int(Double.random(in: 0...100)))%")
@@ -351,7 +350,7 @@ struct AdvancedAnalyticsView: View {
 
 // MARK: - Supporting Views
 
-struct MetricCard: View {
+struct AnalyticsMetricCard: View {
     let title: String
     let value: String
     let trend: TrendDirection

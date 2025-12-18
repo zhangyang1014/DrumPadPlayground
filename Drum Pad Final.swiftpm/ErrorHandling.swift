@@ -9,6 +9,17 @@ import CloudKit
 /// Comprehensive error handling system for the drum trainer application
 /// Provides audio system error recovery, data integrity checks, and user-friendly error messages
 
+// MARK: - Validation Error Type
+// 定义本地 ValidationError 类型，避免与其他模块的类型冲突
+public struct ContentValidationError: Error, LocalizedError {
+    public let field: String
+    public let reason: String
+    
+    public var errorDescription: String? {
+        return "\(field): \(reason)"
+    }
+}
+
 // MARK: - Error Types
 
 public enum DrumTrainerError: Error, LocalizedError {
@@ -29,7 +40,7 @@ public enum DrumTrainerError: Error, LocalizedError {
     
     // Content Management Errors
     case invalidMIDIFile(fileName: String, reason: String)
-    case contentValidationFailure(errors: [ValidationError])
+    case contentValidationFailure(errors: [ContentValidationError])
     case unsupportedFileFormat(fileName: String, expectedFormat: String)
     case contentImportFailure(fileName: String, underlying: Error)
     
@@ -196,7 +207,8 @@ public class ErrorRecoveryManager: ErrorRecoveryProtocol {
     private let coreDataManager: CoreDataManager
     private let cloudKitManager: CloudKitSyncManager
     
-    public init(conductor: Conductor, coreDataManager: CoreDataManager, cloudKitManager: CloudKitSyncManager) {
+    // 使用 internal 访问级别，因为 CloudKitSyncManager 是 internal 类型
+    init(conductor: Conductor, coreDataManager: CoreDataManager, cloudKitManager: CloudKitSyncManager) {
         self.conductor = conductor
         self.coreDataManager = coreDataManager
         self.cloudKitManager = cloudKitManager
@@ -481,12 +493,15 @@ public class DataIntegrityChecker {
         
         let userProgress = coreDataManager.fetchUserProgress()
         
+        // UserProgressData 没有 id 属性，使用默认标识符
+        let progressId = "user_progress"
+        
         // Check for negative values
         if userProgress.currentLevel < 0 {
             issues.append(DataIntegrityIssue(
                 type: .invalidData,
                 entity: "UserProgress",
-                entityId: userProgress.id,
+                entityId: progressId,
                 description: "Negative current level",
                 severity: .medium
             ))
@@ -496,7 +511,7 @@ public class DataIntegrityChecker {
             issues.append(DataIntegrityIssue(
                 type: .invalidData,
                 entity: "UserProgress",
-                entityId: userProgress.id,
+                entityId: progressId,
                 description: "Negative total stars",
                 severity: .medium
             ))
@@ -507,7 +522,7 @@ public class DataIntegrityChecker {
             issues.append(DataIntegrityIssue(
                 type: .inconsistentData,
                 entity: "UserProgress",
-                entityId: userProgress.id,
+                entityId: progressId,
                 description: "Current streak exceeds max streak",
                 severity: .low
             ))
@@ -740,6 +755,12 @@ extension CoreDataManager {
         // Implementation would fetch all score results
         return []
     }
+    
+    func fetchUserProgress() -> UserProgressData {
+        // 返回用户进度数据的默认实例
+        // 使用 ProgressManager.swift 中定义的 UserProgressData（有默认参数）
+        return UserProgressData()
+    }
 }
 
 // MARK: - Extensions for CloudKit Manager
@@ -756,13 +777,11 @@ extension CloudKitSyncManager {
     }
     
     func resetSyncState() {
-        // Implementation would reset CloudKit sync state
-        print("Resetting CloudKit sync state")
-    }
-    
-    func performFullSync() async throws {
-        // Implementation would perform full CloudKit sync
-        print("Performing full CloudKit sync")
+        // 重置同步状态并清理定时器
+        stopSync()
+        Task { @MainActor in
+            self.syncStatus = .notStarted
+        }
     }
 }
 

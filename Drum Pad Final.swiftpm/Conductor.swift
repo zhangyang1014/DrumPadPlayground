@@ -49,6 +49,19 @@ enum MetronomeSound: String, CaseIterable {
     }
 }
 
+// AudioKit 5.x 未提供 MusicalDuration，这里自定义基础节拍时值
+enum MusicalDuration: Double, CaseIterable {
+    case whole = 1.0
+    case half = 0.5
+    case quarter = 0.25
+    case eighth = 0.125
+    case sixteenth = 0.0625
+    case thirtysecond = 0.03125
+    
+    /// 返回用于节拍/延时计算的倍数（直接使用 rawValue）
+    var multiplier: Double { rawValue }
+}
+
 enum MetronomeSubdivision: String, CaseIterable {
     case quarter = "1/4"
     case eighth = "1/8"
@@ -186,6 +199,7 @@ class Conductor: ObservableObject {
     private var midiClient: MIDIClientRef = 0
     private var midiInputPort: MIDIPortRef = 0
     private var connectedDevices: [MIDIDeviceInfo] = []
+    var connectedDevicesCount: Int { connectedDevices.count }
     
     // Real-time Scoring Engine
     let scoreEngine = ScoreEngine()
@@ -381,7 +395,7 @@ class Conductor: ObservableObject {
         let portName = "DrumTrainerInputPort" as CFString
         let inputStatus = MIDIInputPortCreate(midiClient, portName, { (packetList, readProcRefCon, srcConnRefCon) in
             guard let conductor = Unmanaged<Conductor>.fromOpaque(readProcRefCon!).takeUnretainedValue() as Conductor? else { return }
-            conductor.handleMIDIPacketList(packetList.pointee)
+            conductor.handleMIDIPacketList(packetList)
         }, Unmanaged.passUnretained(self).toOpaque(), &midiInputPort)
         
         if inputStatus != noErr {
@@ -408,19 +422,20 @@ class Conductor: ObservableObject {
         }
     }
     
-    private func handleMIDIPacketList(_ packetList: MIDIPacketList) {
-        let packets = packetList.packets
-        var packet = packets
+    private func handleMIDIPacketList(_ packetList: UnsafePointer<MIDIPacketList>) {
+        // 复制到可变变量，避免直接对不可变 pointee 做 inout
+        var packetListCopy = packetList.pointee
+        var packetPointer = withUnsafeMutablePointer(to: &packetListCopy.packet) { $0 }
         
-        for _ in 0..<packetList.numPackets {
-            let data = withUnsafePointer(to: &packet.data) {
-                $0.withMemoryRebound(to: UInt8.self, capacity: Int(packet.length)) {
-                    Array(UnsafeBufferPointer(start: $0, count: Int(packet.length)))
-                }
+        for _ in 0..<packetListCopy.numPackets {
+            let packet = packetPointer.pointee
+            let data: [UInt8] = withUnsafeBytes(of: packet.data) { rawBuffer in
+                let base = rawBuffer.baseAddress!.assumingMemoryBound(to: UInt8.self)
+                return Array(UnsafeBufferPointer(start: base, count: Int(packet.length)))
             }
             
             processMIDIData(data, timestamp: packet.timeStamp)
-            packet = MIDIPacketNext(&packet).pointee
+            packetPointer = MIDIPacketNext(packetPointer)
         }
     }
     
@@ -513,36 +528,46 @@ class Conductor: ObservableObject {
     func connectToDevice(_ device: MIDIDeviceInfo) {
         midiConnectionStatus = .connecting
         
-        // Get all sources from the device
-        let sourceCount = MIDIDeviceGetNumberOfSources(device.deviceRef)
+        // 遍历设备的实体和源
+        let entityCount = MIDIDeviceGetNumberOfEntities(device.deviceRef)
         
-        for i in 0..<sourceCount {
-            let source = MIDIDeviceGetSource(device.deviceRef, i)
-            let status = MIDIPortConnectSource(midiInputPort, source, nil)
+        for entityIndex in 0..<entityCount {
+            let entity = MIDIDeviceGetEntity(device.deviceRef, entityIndex)
+            let sourceCount = MIDIEntityGetNumberOfSources(entity)
             
-            if status == noErr {
-                DispatchQueue.main.async {
-                    self.midiConnectionStatus = .connected
-                    if !self.connectedDevices.contains(device) {
-                        self.connectedDevices.append(device)
+            for sourceIndex in 0..<sourceCount {
+                let source = MIDIEntityGetSource(entity, sourceIndex)
+                let status = MIDIPortConnectSource(midiInputPort, source, nil)
+                
+                if status == noErr {
+                    DispatchQueue.main.async {
+                        self.midiConnectionStatus = .connected
+                        if !self.connectedDevices.contains(device) {
+                            self.connectedDevices.append(device)
+                        }
                     }
-                }
-            } else {
-                print("Failed to connect to MIDI source: \(status)")
-                DispatchQueue.main.async {
-                    self.midiConnectionStatus = .error
-                    self.errorPresenter?.presentError(.midiConnectionFailure(deviceName: device.name, underlying: nil))
+                } else {
+                    print("Failed to connect to MIDI source: \(status)")
+                    DispatchQueue.main.async {
+                        self.midiConnectionStatus = .error
+                        self.errorPresenter?.presentError(.midiConnectionFailure(deviceName: device.name, underlying: nil))
+                    }
                 }
             }
         }
     }
     
     func disconnectFromDevice(_ device: MIDIDeviceInfo) {
-        let sourceCount = MIDIDeviceGetNumberOfSources(device.deviceRef)
+        let entityCount = MIDIDeviceGetNumberOfEntities(device.deviceRef)
         
-        for i in 0..<sourceCount {
-            let source = MIDIDeviceGetSource(device.deviceRef, i)
-            MIDIPortDisconnectSource(midiInputPort, source)
+        for entityIndex in 0..<entityCount {
+            let entity = MIDIDeviceGetEntity(device.deviceRef, entityIndex)
+            let sourceCount = MIDIEntityGetNumberOfSources(entity)
+            
+            for sourceIndex in 0..<sourceCount {
+                let source = MIDIEntityGetSource(entity, sourceIndex)
+                MIDIPortDisconnectSource(midiInputPort, source)
+            }
         }
         
         DispatchQueue.main.async {
@@ -640,15 +665,18 @@ class Conductor: ObservableObject {
     // MARK: - Metronome Management
     
     private func loadMetronomeSounds() {
-        // Create metronome audio files for each sound type
-        let metronomeFiles = MetronomeSound.allCases.compactMap { sound -> AKAudioFile? in
-            guard let url = Bundle.main.url(forResource: sound.fileName, withExtension: "wav") else {
-                // If specific metronome files don't exist, create synthetic sounds
-                return createSyntheticMetronomeSound(for: sound)
+        // Create metronome audio files for each sound type (AudioKit 5 需要 [AVAudioFile])
+        let metronomeFiles: [AVAudioFile] = MetronomeSound.allCases.compactMap { sound in
+            if let resourceURL = ResourceLoader.loadAudioFile(named: sound.fileName),
+               let file = try? AVAudioFile(forReading: resourceURL) {
+                return file
             }
-            return try? AKAudioFile(forReading: url)
+            
+            // If specific metronome files don't exist, create synthetic sounds
+            Log("Metronome sound file not found: \(sound.fileName).wav, using synthetic sound")
+            return createSyntheticMetronomeSound(for: sound)
         }
-        
+
         do {
             try metronome.loadAudioFiles(metronomeFiles)
         } catch {
@@ -656,8 +684,8 @@ class Conductor: ObservableObject {
             errorPresenter?.presentError(.audioEngineFailure(underlying: error))
         }
     }
-    
-    private func createSyntheticMetronomeSound(for sound: MetronomeSound) -> AKAudioFile? {
+
+    private func createSyntheticMetronomeSound(for sound: MetronomeSound) -> AVAudioFile? {
         // Create a simple synthetic metronome sound if audio files don't exist
         // This is a fallback - in production, you'd have actual audio files
         
@@ -705,7 +733,7 @@ class Conductor: ObservableObject {
         do {
             let audioFile = try AVAudioFile(forWriting: tempURL, settings: format.settings)
             try audioFile.write(from: buffer)
-            return try AKAudioFile(forReading: tempURL)
+            return try AVAudioFile(forReading: tempURL)
         } catch {
             Log("Could not create synthetic metronome sound: \(error)")
             // Don't present error for synthetic sound creation failure - it's a fallback

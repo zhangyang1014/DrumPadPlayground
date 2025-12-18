@@ -113,9 +113,15 @@ struct SocialSharingView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
             
-            TextField("What's on your mind?", text: $customMessage, axis: .vertical)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .lineLimit(3...6)
+            if #available(iOS 16.0, *) {
+                TextField("What's on your mind?", text: $customMessage, axis: .vertical)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .lineLimit(3...6)
+            } else {
+                // iOS 15 兼容写法（无 axis/lineLimit 多行支持，可退化为单行输入）
+                TextField("What's on your mind?", text: $customMessage)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+            }
         }
     }
     
@@ -484,13 +490,20 @@ struct PlatformButton: View {
 
 extension ScoreResult {
     init(totalScore: Float, starRating: Int, isPlatinum: Bool, isBlackStar: Bool, timingResults: [TimingResult], streakCount: Int, missCount: Int, completionTime: TimeInterval) {
-        self.totalScore = totalScore
-        self.starRating = starRating
-        self.isPlatinum = isPlatinum
-        self.isBlackStar = isBlackStar
-        self.timingResults = timingResults
-        self.streakCount = streakCount
-        self.missCount = missCount
-        self.completionTime = completionTime
+        self = ScoreResult(
+            totalScore: totalScore,
+            starRating: starRating,
+            isPlatinum: isPlatinum,
+            isBlackStar: isBlackStar,
+            timingResults: timingResults,
+            streakCount: streakCount,
+            maxStreak: streakCount,
+            missCount: missCount,
+            extraCount: 0,
+            perfectCount: 0,
+            earlyCount: 0,
+            lateCount: 0,
+            completionTime: completionTime
+        )
     }
 }

@@ -1,9 +1,13 @@
 # App Store Submission Materials
 
+| 版本 | 日期 | 变更内容 | 变更人 |
+| --- | --- | --- | --- |
+| v1.0.1 | 2025-12-17 | 系统要求更新至 iOS 16.0 | 大象 |
+
 ## App Information
 
 ### App Name
-**Melodic Drum Trainer**
+**FingerDrumHero**
 
 ### Subtitle
 Interactive drum practice with real-time feedback
@@ -15,7 +19,7 @@ Interactive drum practice app
 
 **Full Description**
 
-Transform your drumming with Melodic Drum Trainer - the interactive practice app that makes learning drums engaging, measurable, and fun!
+Transform your drumming with FingerDrumHero - the interactive practice app that makes learning drums engaging, measurable, and fun!
 
 **🥁 INTERACTIVE PRACTICE**
 • Real-time feedback on your timing and accuracy
@@ -46,15 +50,15 @@ Transform your drumming with Melodic Drum Trainer - the interactive practice app
 • Practice on multiple iPads seamlessly
 • Backup and restore your achievements
 
-Perfect for drummers of all levels - from beginners learning their first beats to advanced players perfecting complex patterns. Whether you're practicing rudiments, grooves, or full songs, Melodic Drum Trainer provides the structure and feedback you need to improve faster.
+Perfect for drummers of all levels - from beginners learning their first beats to advanced players perfecting complex patterns. Whether you're practicing rudiments, grooves, or full songs, FingerDrumHero provides the structure and feedback you need to improve faster.
 
 **REQUIREMENTS**
-• iOS 15.2 or later
+• iOS 16.0 or later
 • Compatible with iPad
 • MIDI drum device recommended (works with touch controls too)
 • Wired headphones recommended for best timing accuracy
 
-Start your drumming journey today with Melodic Drum Trainer!
+Start your drumming journey today with FingerDrumHero!
 
 ### Keywords
 drums, drumming, practice, music, education, MIDI, rhythm, metronome, lessons, interactive, training, percussion, beats, grooves, rudiments
@@ -118,13 +122,13 @@ drums, drumming, practice, music, education, MIDI, rhythm, metronome, lessons, i
 
 ### App Store Connect Settings
 
-**Bundle ID**: com.audiokit.melodic-drum-trainer
-**SKU**: MDT-001
+**Bundle ID**: com.bugelife.fingerdrumhero
+**SKU**: FDH-001
 **Content Rights**: Developed in-house
 
 ### Build Settings
-- **Deployment Target**: iOS 15.2
-- **Supported Devices**: iPad (all models supporting iOS 15.2+)
+- **Deployment Target**: iOS 16.0
+- **Supported Devices**: iPad (all models supporting iOS 16.0+)
 - **Orientation**: Landscape preferred, portrait supported
 - **Background Modes**: Audio processing for practice sessions
 

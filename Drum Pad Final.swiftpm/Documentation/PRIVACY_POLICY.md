@@ -1,11 +1,11 @@
-# Privacy Policy - Melodic Drum Trainer
+# Privacy Policy - FingerDrumHero
 
-**Effective Date**: December 16, 2024  
-**Last Updated**: December 16, 2024
+**Effective Date**: December 17, 2024  
+**Last Updated**: December 17, 2024
 
 ## Introduction
 
-AudioKit Pro ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the Melodic Drum Trainer application ("the App").
+Shanghai Le Zhi Xiang Xing Network Technology Co., Ltd. ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use the FingerDrumHero application ("the App").
 
 ## Information We Collect
 
@@ -153,7 +153,7 @@ When you enable CloudKit sync:
 ## Contact Information
 
 ### Privacy Questions
-- **Email**: [privacy@melodicdrumtrainer.com](mailto:privacy@melodicdrumtrainer.com)
+- **Email**: [apple@bugelife.com](mailto:apple@bugelife.com)
 - **Response Time**: We aim to respond within 48 hours
 - **Subject Line**: Please include "Privacy Policy" in your subject line
 
@@ -199,10 +199,10 @@ For requests regarding your data:
 
 **Questions or Concerns?**
 
-If you have any questions about this Privacy Policy or our privacy practices, please contact us at [privacy@melodicdrumtrainer.com](mailto:privacy@melodicdrumtrainer.com).
+If you have any questions about this Privacy Policy or our privacy practices, please contact us at [apple@bugelife.com](mailto:apple@bugelife.com).
 
-This policy is designed to be transparent and user-friendly. We believe privacy is a fundamental right and have built Melodic Drum Trainer with privacy-by-design principles.
+This policy is designed to be transparent and user-friendly. We believe privacy is a fundamental right and have built FingerDrumHero with privacy-by-design principles.
 
 ---
 
-*AudioKit Pro - Committed to Your Privacy*
+*Shanghai Le Zhi Xiang Xing Network Technology Co., Ltd. - Committed to Your Privacy*

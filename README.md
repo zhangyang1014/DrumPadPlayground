@@ -1,8 +1,8 @@
-# Melodic Drum Trainer
+# FingerDrumHero
 
 An interactive drum practice application built with SwiftUI and AudioKit, designed to help drummers of all levels improve their timing, technique, and musical skills through structured lessons and real-time feedback.
 
-![Build Status](https://github.com/audiokit/melodic-drum-trainer/workflows/CI/badge.svg)
+![Build Status](https://github.com/zhangyang1014/DrumPadPlayground/workflows/CI/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-iOS%2015.2%2B-blue)
 ![Language](https://img.shields.io/badge/language-Swift%205.7-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -68,8 +68,8 @@ The app will be available on the App Store after submission and approval.
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/audiokit/melodic-drum-trainer.git
-   cd melodic-drum-trainer
+   git clone https://github.com/zhangyang1014/DrumPadPlayground.git
+   cd DrumPadPlayground
    ```
 
 2. **Open in Xcode**
@@ -192,7 +192,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Documentation**: See `Documentation/USER_MANUAL.md`
 - **Issues**: Report bugs via GitHub Issues
 - **Discussions**: Join community discussions in GitHub Discussions
-- **Contact**: [support@melodicdrumtrainer.com](mailto:support@melodicdrumtrainer.com)
+- **Contact**: [apple@bugelife.com](mailto:apple@bugelife.com)
 
 ---
 

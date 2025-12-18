@@ -700,15 +700,8 @@ struct WeekDayData {
     let goalMet: Bool
 }
 
-struct Achievement {
-    let id: String
-    let title: String
-    let description: String
-    let iconName: String
-    let color: Color
-    let isUnlocked: Bool
-    let unlockedDate: Date?
-}
+// 注意：Achievement 类型已在 ProgressManager.swift 中定义，这里不再重复定义
+// 如果需要使用 Achievement，请直接使用 ProgressManager.swift 中的定义
 
 // MARK: - Preview
 

@@ -2,6 +2,9 @@ import Foundation
 import AudioKit
 import AVFoundation
 import os.log
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Performance Monitoring and Optimization System
 
@@ -10,18 +13,18 @@ import os.log
 
 // MARK: - Performance Metrics
 
-public struct PerformanceMetrics {
-    public let timestamp: Date
-    public let audioLatency: TimeInterval
-    public let memoryUsage: Int64 // bytes
-    public let cpuUsage: Double // percentage
-    public let audioBufferUnderruns: Int
-    public let midiProcessingLatency: TimeInterval
-    public let frameDrops: Int
-    public let batteryLevel: Float
-    public let thermalState: ProcessInfo.ThermalState
+struct PerformanceMetrics {
+    let timestamp: Date
+    let audioLatency: TimeInterval
+    let memoryUsage: Int64 // bytes
+    let cpuUsage: Double // percentage
+    let audioBufferUnderruns: Int
+    let midiProcessingLatency: TimeInterval
+    let frameDrops: Int
+    let batteryLevel: Float
+    let thermalState: ProcessInfo.ThermalState
     
-    public var isPerformanceGood: Bool {
+    var isPerformanceGood: Bool {
         return audioLatency < 0.020 && // < 20ms
                cpuUsage < 80.0 && // < 80%
                audioBufferUnderruns == 0 &&
@@ -29,7 +32,7 @@ public struct PerformanceMetrics {
                frameDrops == 0
     }
     
-    public var performanceScore: Double {
+    var performanceScore: Double {
         var score = 100.0
         
         // Audio latency penalty
@@ -59,11 +62,11 @@ public struct PerformanceMetrics {
 
 // MARK: - Performance Monitor
 
-public class PerformanceMonitor: ObservableObject {
-    @Published public var currentMetrics: PerformanceMetrics?
-    @Published public var isMonitoring: Bool = false
-    @Published public var performanceHistory: [PerformanceMetrics] = []
-    @Published public var optimizationRecommendations: [OptimizationRecommendation] = []
+class PerformanceMonitor: ObservableObject {
+    @Published var currentMetrics: PerformanceMetrics?
+    @Published var isMonitoring: Bool = false
+    @Published var performanceHistory: [PerformanceMetrics] = []
+    @Published var optimizationRecommendations: [OptimizationRecommendation] = []
     
     private var monitoringTimer: Timer?
     private var audioEngine: AudioEngine?
@@ -77,13 +80,13 @@ public class PerformanceMonitor: ObservableObject {
     // Logging
     private let logger = Logger(subsystem: "com.drumtrainer.performance", category: "monitoring")
     
-    public init() {
+    init() {
         setupNotificationObservers()
     }
     
     // MARK: - Public Interface
     
-    public func startMonitoring(audioEngine: AudioEngine, conductor: Conductor) {
+    func startMonitoring(audioEngine: AudioEngine, conductor: Conductor) {
         self.audioEngine = audioEngine
         self.conductor = conductor
         
@@ -101,7 +104,7 @@ public class PerformanceMonitor: ObservableObject {
         setupAudioSessionMonitoring()
     }
     
-    public func stopMonitoring() {
+    func stopMonitoring() {
         guard isMonitoring else { return }
         
         isMonitoring = false
@@ -111,7 +114,7 @@ public class PerformanceMonitor: ObservableObject {
         logger.info("Stopped performance monitoring")
     }
     
-    public func recordMIDIEvent(timestamp: TimeInterval) {
+    func recordMIDIEvent(timestamp: TimeInterval) {
         midiEventTimestamps.append(timestamp)
         
         // Keep only recent events (last 10 seconds)
@@ -119,7 +122,7 @@ public class PerformanceMonitor: ObservableObject {
         midiEventTimestamps.removeAll { $0 < cutoff }
     }
     
-    public func getAveragePerformanceScore(over duration: TimeInterval = 60.0) -> Double {
+    func getAveragePerformanceScore(over duration: TimeInterval = 60.0) -> Double {
         let cutoff = Date().addingTimeInterval(-duration)
         let recentMetrics = performanceHistory.filter { $0.timestamp >= cutoff }
         
@@ -129,7 +132,7 @@ public class PerformanceMonitor: ObservableObject {
         return totalScore / Double(recentMetrics.count)
     }
     
-    public func exportPerformanceReport() -> String {
+    func exportPerformanceReport() -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .medium
@@ -461,18 +464,18 @@ public struct OptimizationRecommendation: Identifiable, Equatable {
 
 // MARK: - Performance Optimizer
 
-public class PerformanceOptimizer {
+class PerformanceOptimizer {
     private let performanceMonitor: PerformanceMonitor
     private let conductor: Conductor
     private let audioEngine: AudioEngine
     
-    public init(performanceMonitor: PerformanceMonitor, conductor: Conductor, audioEngine: AudioEngine) {
+    init(performanceMonitor: PerformanceMonitor, conductor: Conductor, audioEngine: AudioEngine) {
         self.performanceMonitor = performanceMonitor
         self.conductor = conductor
         self.audioEngine = audioEngine
     }
     
-    public func applyAutomaticOptimizations() {
+    func applyAutomaticOptimizations() {
         guard let metrics = performanceMonitor.currentMetrics else { return }
         
         // Apply optimizations based on current performance
@@ -560,7 +563,7 @@ public class AudioPerformanceAnalyzer {
     private var audioLatencies: [TimeInterval] = []
     private var dropoutEvents: [Date] = []
     
-    public func recordAudioBuffer(size: Int) {
+    func recordAudioBuffer(size: Int) {
         audioBufferSizes.append(size)
         
         // Keep only recent data
@@ -569,7 +572,7 @@ public class AudioPerformanceAnalyzer {
         }
     }
     
-    public func recordAudioLatency(_ latency: TimeInterval) {
+    func recordAudioLatency(_ latency: TimeInterval) {
         audioLatencies.append(latency)
         
         // Keep only recent data
@@ -578,7 +581,7 @@ public class AudioPerformanceAnalyzer {
         }
     }
     
-    public func recordDropoutEvent() {
+    func recordDropoutEvent() {
         dropoutEvents.append(Date())
         
         // Keep only recent events (last hour)
@@ -586,7 +589,7 @@ public class AudioPerformanceAnalyzer {
         dropoutEvents.removeAll { $0 < cutoff }
     }
     
-    public func getAudioPerformanceReport() -> AudioPerformanceReport {
+    func getAudioPerformanceReport() -> AudioPerformanceReport {
         return AudioPerformanceReport(
             averageLatency: audioLatencies.isEmpty ? 0 : audioLatencies.reduce(0, +) / Double(audioLatencies.count),
             maxLatency: audioLatencies.max() ?? 0,
@@ -634,7 +637,7 @@ public class DebugLogger {
         case critical = "CRITICAL"
     }
     
-    public func log(_ level: LogLevel, category: String, message: String) {
+    func log(_ level: LogLevel, category: String, message: String) {
         let entry = LogEntry(
             timestamp: Date(),
             level: level,
@@ -664,7 +667,7 @@ public class DebugLogger {
         }
     }
     
-    public func exportLogs() -> String {
+    func exportLogs() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         
@@ -681,7 +684,7 @@ public class DebugLogger {
         return logString
     }
     
-    public func clearLogs() {
+    func clearLogs() {
         logEntries.removeAll()
     }
 }
@@ -697,7 +700,7 @@ extension Conductor {
             "delayMix": delayMix,
             "tempo": tempo,
             "midiConnectionStatus": midiConnectionStatus.rawValue,
-            "connectedDevicesCount": connectedDevices.count
+            "connectedDevicesCount": connectedDevicesCount
         ]
     }
 }

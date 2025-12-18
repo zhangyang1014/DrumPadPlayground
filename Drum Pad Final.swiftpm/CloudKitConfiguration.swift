@@ -30,103 +30,104 @@ public class CloudKitConfiguration {
         case scoringProfile = "ScoringProfile"
         case audioAssets = "AudioAssets"
         
-        var fields: [String: CKRecord.FieldType] {
+        /// 样例字段值（用于建立/验证 schema）
+        var sampleFields: [String: Any] {
             switch self {
             case .userProgress:
                 return [
-                    "userId": .string,
-                    "currentLevel": .int64,
-                    "totalStars": .int64,
-                    "currentStreak": .int64,
-                    "maxStreak": .int64,
-                    "totalTrophies": .int64,
-                    "dailyGoalMinutes": .int64,
-                    "lastPracticeDate": .dateTime,
-                    "totalPracticeTime": .double,
-                    "createdAt": .dateTime,
-                    "updatedAt": .dateTime
+                    "userId": "sample-user",
+                    "currentLevel": Int64(1),
+                    "totalStars": Int64(0),
+                    "currentStreak": Int64(0),
+                    "maxStreak": Int64(0),
+                    "totalTrophies": Int64(0),
+                    "dailyGoalMinutes": Int64(5),
+                    "lastPracticeDate": Date(),
+                    "totalPracticeTime": 0.0,
+                    "createdAt": Date(),
+                    "updatedAt": Date()
                 ]
             case .lesson:
                 return [
-                    "title": .string,
-                    "courseId": .string,
-                    "instrument": .string,
-                    "defaultBPM": .double,
-                    "timeSignatureNumerator": .int64,
-                    "timeSignatureDenominator": .int64,
-                    "duration": .double,
-                    "tags": .string,
-                    "difficulty": .int64,
-                    "createdAt": .dateTime,
-                    "updatedAt": .dateTime
+                    "title": "Sample Lesson",
+                    "courseId": "course-1",
+                    "instrument": "drums",
+                    "defaultBPM": 120.0,
+                    "timeSignatureNumerator": Int64(4),
+                    "timeSignatureDenominator": Int64(4),
+                    "duration": 60.0,
+                    "tags": "[]",
+                    "difficulty": Int64(1),
+                    "createdAt": Date(),
+                    "updatedAt": Date()
                 ]
             case .course:
                 return [
-                    "title": .string,
-                    "courseDescription": .string,
-                    "difficulty": .int64,
-                    "tags": .string,
-                    "estimatedDuration": .double,
-                    "createdAt": .dateTime,
-                    "updatedAt": .dateTime,
-                    "isPublished": .int64
+                    "title": "Sample Course",
+                    "courseDescription": "Sample description",
+                    "difficulty": Int64(1),
+                    "tags": "[]",
+                    "estimatedDuration": 3600.0,
+                    "createdAt": Date(),
+                    "updatedAt": Date(),
+                    "isPublished": Int64(0)
                 ]
             case .scoreResult:
                 return [
-                    "lessonId": .string,
-                    "totalScore": .double,
-                    "starRating": .int64,
-                    "isPlatinum": .int64,
-                    "isBlackStar": .int64,
-                    "streakCount": .int64,
-                    "maxStreak": .int64,
-                    "missCount": .int64,
-                    "extraCount": .int64,
-                    "perfectCount": .int64,
-                    "earlyCount": .int64,
-                    "lateCount": .int64,
-                    "completionTime": .double,
-                    "completedAt": .dateTime,
-                    "playbackMode": .string,
-                    "timingResultsData": .bytes
+                    "lessonId": "lesson-1",
+                    "totalScore": 95.0,
+                    "starRating": Int64(3),
+                    "isPlatinum": Int64(0),
+                    "isBlackStar": Int64(0),
+                    "streakCount": Int64(10),
+                    "maxStreak": Int64(15),
+                    "missCount": Int64(1),
+                    "extraCount": Int64(0),
+                    "perfectCount": Int64(20),
+                    "earlyCount": Int64(2),
+                    "lateCount": Int64(1),
+                    "completionTime": 180.0,
+                    "completedAt": Date(),
+                    "playbackMode": "performance",
+                    "timingResultsData": Data()
                 ]
             case .dailyProgress:
                 return [
-                    "userId": .string,
-                    "date": .dateTime,
-                    "practiceTimeMinutes": .int64,
-                    "goalAchieved": .int64,
-                    "lessonsCompleted": .int64,
-                    "starsEarned": .int64,
-                    "createdAt": .dateTime
+                    "userId": "sample-user",
+                    "date": Date(),
+                    "practiceTimeMinutes": Int64(10),
+                    "goalAchieved": Int64(1),
+                    "lessonsCompleted": Int64(1),
+                    "starsEarned": Int64(3),
+                    "createdAt": Date()
                 ]
             case .lessonStep:
                 return [
-                    "lessonId": .string,
-                    "order": .int64,
-                    "title": .string,
-                    "stepDescription": .string,
-                    "targetEventsData": .bytes,
-                    "bpmOverride": .double,
-                    "assistLevel": .string,
-                    "createdAt": .dateTime
+                    "lessonId": "lesson-1",
+                    "order": Int64(1),
+                    "title": "Step 1",
+                    "stepDescription": "Sample step",
+                    "targetEventsData": Data(),
+                    "bpmOverride": 120.0,
+                    "assistLevel": "none",
+                    "createdAt": Date()
                 ]
             case .scoringProfile:
                 return [
-                    "perfectWindow": .double,
-                    "earlyWindow": .double,
-                    "lateWindow": .double,
-                    "missThreshold": .double,
-                    "extraPenalty": .double,
-                    "gradePenaltyMultiplier": .double,
-                    "streakBonus": .double
+                    "perfectWindow": 0.02,
+                    "earlyWindow": 0.04,
+                    "lateWindow": 0.04,
+                    "missThreshold": 0.08,
+                    "extraPenalty": 1.0,
+                    "gradePenaltyMultiplier": 0.5,
+                    "streakBonus": 1.2
                 ]
             case .audioAssets:
                 return [
-                    "backingTrackURL": .string,
-                    "clickTrackURL": .string,
-                    "previewURL": .string,
-                    "stemURLsData": .bytes
+                    "backingTrackURL": "https://example.com/backing.wav",
+                    "clickTrackURL": "https://example.com/click.wav",
+                    "previewURL": "https://example.com/preview.wav",
+                    "stemURLsData": Data()
                 ]
             }
         }
@@ -141,8 +142,6 @@ public class CloudKitConfiguration {
             do {
                 // Try to fetch the record type to validate it exists
                 let query = CKQuery(recordType: recordType.rawValue, predicate: NSPredicate(value: false))
-                query.resultsLimit = 1
-                
                 _ = try await database.records(matching: query)
                 print("✓ Record type \(recordType.rawValue) is valid")
             } catch {
@@ -163,21 +162,8 @@ public class CloudKitConfiguration {
                 let record = CKRecord(recordType: recordType.rawValue)
                 
                 // Set sample values for each field to establish field types
-                for (fieldName, fieldType) in recordType.fields {
-                    switch fieldType {
-                    case .string:
-                        record[fieldName] = "sample"
-                    case .int64:
-                        record[fieldName] = 0
-                    case .double:
-                        record[fieldName] = 0.0
-                    case .dateTime:
-                        record[fieldName] = Date()
-                    case .bytes:
-                        record[fieldName] = Data()
-                    default:
-                        break
-                    }
+                for (fieldName, sampleValue) in recordType.sampleFields {
+                    record[fieldName] = sampleValue as? CKRecordValue
                 }
                 
                 // Save the record to establish schema
@@ -215,15 +201,50 @@ public class CloudKitConfiguration {
         }
         
         // Request application permissions
-        let permissionStatus = try await container.status(forApplicationPermission: .userDiscoverability)
+        // NOTE: Some toolchains (e.g., Swift Playgrounds SPM) do not expose
+        // CKContainer.ApplicationPermission. To keep builds green, we skip
+        // requesting permissions in that environment.
+        #if false
+        let permission: CKContainer.ApplicationPermission = .userDiscoverability
+        let permissionStatus = try await fetchApplicationPermissionStatus(container: container, permission: permission)
         
-        if permissionStatus == .initialState {
-            let newStatus = try await container.requestApplicationPermission(.userDiscoverability)
-            if newStatus != .granted {
+        if permissionStatus == CKContainer.ApplicationPermissionStatus.initialState {
+            let newStatus = try await requestApplicationPermission(container: container, permission: permission)
+            if newStatus != CKContainer.ApplicationPermissionStatus.granted {
                 print("⚠️ User discoverability permission not granted")
             }
         }
+        #else
+        _ = container // silence unused variable warning when skipping permission request
+        #endif
     }
+
+    // MARK: - Permission Helpers (guarded for toolchains missing ApplicationPermission)
+    #if false
+    private static func fetchApplicationPermissionStatus(container: CKContainer, permission: CKContainer.ApplicationPermission) async throws -> CKContainer.ApplicationPermissionStatus {
+        try await withCheckedThrowingContinuation { continuation in
+            container.status(forApplicationPermission: permission) { status, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+    }
+    
+    private static func requestApplicationPermission(container: CKContainer, permission: CKContainer.ApplicationPermission) async throws -> CKContainer.ApplicationPermissionStatus {
+        try await withCheckedThrowingContinuation { continuation in
+            container.requestApplicationPermission(permission) { status, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+    }
+    #endif
     
     // MARK: - CloudKit Zones (for advanced use cases)
     

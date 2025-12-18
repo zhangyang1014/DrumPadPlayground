@@ -19,7 +19,9 @@ public class CoreDataManager: ObservableObject {
     // MARK: - Core Data Stack
     
     lazy var persistentContainer: NSPersistentCloudKitContainer = {
-        let container = NSPersistentCloudKitContainer(name: "DrumTrainerModel")
+        // 使用纯代码定义的模型，避免 Swift Playgrounds 的 .xcdatamodeld 兼容性警告
+        let managedObjectModel = CoreDataModelDefinition.createModel()
+        let container = NSPersistentCloudKitContainer(name: "DrumTrainerModel", managedObjectModel: managedObjectModel)
         
         // Configure for CloudKit
         let storeDescription = container.persistentStoreDescriptions.first

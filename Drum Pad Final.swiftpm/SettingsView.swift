@@ -369,9 +369,9 @@ class AudioDeviceManager: ObservableObject {
     
     private func setupAudioSession() {
         do {
-            try audioSession.setCategory(.playAndRecord, 
-                                       mode: .default, 
-                                       options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setCategory(.playAndRecord,
+                                       mode: .default,
+                                       options: [.defaultToSpeaker, .allowBluetoothHFP])
             try audioSession.setActive(true)
         } catch {
             print("Failed to setup audio session: \(error.localizedDescription)")
@@ -449,12 +449,12 @@ class AudioDeviceManager: ObservableObject {
         var options: AVAudioSession.CategoryOptions = [.defaultToSpeaker]
         
         if device.isBluetooth {
-            options.insert(.allowBluetooth)
+            options.insert(.allowBluetoothHFP)
         }
         
         switch device.deviceType {
         case .bluetoothA2DP, .bluetoothHFP, .bluetoothLE:
-            options.insert(.allowBluetooth)
+            options.insert(.allowBluetoothHFP)
         case .headphones, .wiredHeadset:
             // No special options needed for wired devices
             break
@@ -677,144 +677,9 @@ struct LatencyTestView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 24) {
-                VStack(spacing: 16) {
-                    Image(systemName: "waveform.path.ecg")
-                        .font(.system(size: 48))
-                        .foregroundColor(.blue)
-                    
-                    Text("Latency Test")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("This test will help determine the optimal latency compensation for your audio setup")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                
-                // Current Device Info
-                if let currentDevice = deviceManager.currentDevice {
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("Current Device:")
-                                .font(.headline)
-                            Spacer()
-                        }
-                        
-                        HStack {
-                            Image(systemName: currentDevice.isBluetooth ? "bluetooth" : "headphones")
-                                .foregroundColor(currentDevice.isBluetooth ? .blue : .gray)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(currentDevice.name)
-                                    .font(.body)
-                                Text(currentDevice.deviceType.displayName)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if currentDevice.isBluetooth {
-                                Text("~\(Int(currentDevice.deviceType.expectedLatency * 1000))ms")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        }
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                }
-                
-                // Test Options
-                VStack(spacing: 16) {
-                    if showingAutoMeasurement {
-                        VStack(spacing: 8) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                            Text("Measuring system latency...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        Button("Auto-Detect Latency") {
-                            showingAutoMeasurement = true
-                            autoMeasureLatency()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                    }
-                    
-                    Text("or")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if testResults.isEmpty && !latencyTestManager.isTestRunning {
-                        VStack(spacing: 8) {
-                            Text("Manual Test")
-                                .font(.headline)
-                            
-                            Text("Tap the button below when you hear the metronome click")
-                                .font(.body)
-                                .multilineTextAlignment(.center)
-                            
-                            Button("Start Manual Test") {
-                                startManualTest()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.large)
-                        }
-                    } else if latencyTestManager.isTestRunning {
-                        VStack(spacing: 12) {
-                            Text("Listen for the click and tap when you hear it")
-                                .font(.headline)
-                                .multilineTextAlignment(.center)
-                            
-                            ProgressView(value: latencyTestManager.testProgress)
-                                .progressViewStyle(LinearProgressViewStyle())
-                            
-                            Button("Tap Now!") {
-                                recordTap()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            
-                            Text("Test \(Int(latencyTestManager.testProgress * 10) + 1) of 10")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Button("Cancel Test") {
-                                cancelTest()
-                            }
-                            .font(.caption)
-                            .foregroundColor(.red)
-                        }
-                    } else if !testResults.isEmpty {
-                        VStack(spacing: 12) {
-                            Text("Test Complete")
-                                .font(.headline)
-                                .foregroundColor(.green)
-                            
-                            Text("Recommended compensation: \(Int(recommendedCompensation))ms")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                            
-                            Button("Apply Recommendation") {
-                                currentCompensation = recommendedCompensation
-                                onCompensationChange()
-                                presentationMode.wrappedValue.dismiss()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            
-                            Button("Run Test Again") {
-                                resetTest()
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    }
-                }
-                
+                headerSection
+                currentDeviceSection
+                testOptionsSection
                 Spacer()
             }
             .padding(24)
@@ -825,6 +690,163 @@ struct LatencyTestView: View {
                     presentationMode.wrappedValue.dismiss()
                 }
             )
+        }
+    }
+
+    @ViewBuilder
+    private var headerSection: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "waveform.path.ecg")
+                .font(.system(size: 48))
+                .foregroundColor(.blue)
+            
+            Text("Latency Test")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("This test will help determine the optimal latency compensation for your audio setup")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+    
+    @ViewBuilder
+    private var currentDeviceSection: some View {
+        if let currentDevice = deviceManager.currentDevice {
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Current Device:")
+                        .font(.headline)
+                    Spacer()
+                }
+                
+                HStack {
+                    Image(systemName: currentDevice.isBluetooth ? "bluetooth" : "headphones")
+                        .foregroundColor(currentDevice.isBluetooth ? .blue : .gray)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(currentDevice.name)
+                            .font(.body)
+                        Text(currentDevice.deviceType.displayName)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if currentDevice.isBluetooth {
+                        Text("~\(Int(currentDevice.deviceType.expectedLatency * 1000))ms")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var testOptionsSection: some View {
+        VStack(spacing: 16) {
+            if showingAutoMeasurement {
+                VStack(spacing: 8) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                    Text("Measuring system latency...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Button("Auto-Detect Latency") {
+                    showingAutoMeasurement = true
+                    autoMeasureLatency()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            
+            Text("or")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            if testResults.isEmpty && !latencyTestManager.isTestRunning {
+                manualTestSection
+            } else if latencyTestManager.isTestRunning {
+                runningTestSection
+            } else if !testResults.isEmpty {
+                resultSection
+            }
+        }
+    }
+    
+    private var manualTestSection: some View {
+        VStack(spacing: 8) {
+            Text("Manual Test")
+                .font(.headline)
+            
+            Text("Tap the button below when you hear the metronome click")
+                .font(.body)
+                .multilineTextAlignment(.center)
+            
+            Button("Start Manual Test") {
+                startManualTest()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+        }
+    }
+    
+    private var runningTestSection: some View {
+        VStack(spacing: 12) {
+            Text("Listen for the click and tap when you hear it")
+                .font(.headline)
+                .multilineTextAlignment(.center)
+            
+            ProgressView(value: latencyTestManager.testProgress, total: 1.0)
+                .progressViewStyle(LinearProgressViewStyle())
+            
+            Button("Tap Now!") {
+                recordTap()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            
+            Text("Test \(Int(latencyTestManager.testProgress * 10) + 1) of 10")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            Button("Cancel Test") {
+                cancelTest()
+            }
+            .font(.caption)
+            .foregroundColor(.red)
+        }
+    }
+    
+    private var resultSection: some View {
+        VStack(spacing: 12) {
+            Text("Test Complete")
+                .font(.headline)
+                .foregroundColor(.green)
+            
+            Text("Recommended compensation: \(Int(recommendedCompensation))ms")
+                .font(.title3)
+                .fontWeight(.semibold)
+            
+            Button("Apply Recommendation") {
+                currentCompensation = recommendedCompensation
+                onCompensationChange()
+                presentationMode.wrappedValue.dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            
+            Button("Run Test Again") {
+                resetTest()
+            }
+            .buttonStyle(.bordered)
         }
     }
     
@@ -1131,10 +1153,6 @@ struct AcknowledgmentItem: View {
 
 // MARK: - Notification Extensions
 
-extension Notification.Name {
-    static let highContrastModeChanged = Notification.Name("highContrastModeChanged")
-    static let latencyCompensationChanged = Notification.Name("latencyCompensationChanged")
-}
 
 // MARK: - Preview
 

@@ -1,6 +1,9 @@
 import SwiftUI
 import CloudKit
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - CloudKit Sync Status View
 
@@ -400,7 +403,7 @@ public struct CloudKitSyncSettingsView: View {
         }
         .navigationTitle("iCloud Sync")
         .sheet(isPresented: $showingDataExport) {
-            DataExportView(data: exportedData)
+            CloudKitDataExportView(data: exportedData)
         }
     }
     
@@ -417,7 +420,7 @@ public struct CloudKitSyncSettingsView: View {
 
 // MARK: - Data Export View
 
-struct DataExportView: View {
+private struct CloudKitDataExportView: View {
     let data: [String: Any]
     @Environment(\.dismiss) private var dismiss
     

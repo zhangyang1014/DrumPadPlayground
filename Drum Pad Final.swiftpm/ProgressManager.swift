@@ -1,6 +1,7 @@
 import Foundation
 import CoreData
 import Combine
+import SwiftUI
 
 // MARK: - Progress Manager Protocol
 
@@ -22,6 +23,23 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     @Published var dailyProgress: DailyProgressData = DailyProgressData()
     @Published var achievements: [Achievement] = []
     @Published var recentScores: [ScoreResult] = []
+    
+    // MARK: - Derived UI Properties
+    var currentLevel: Int { currentProgress.currentLevel }
+    var totalStars: Int { currentProgress.totalStars }
+    var totalTrophies: Int { currentProgress.totalTrophies }
+    var currentStreak: Int { currentProgress.currentStreak }
+    var maxStreak: Int { currentProgress.maxStreak }
+    var dailyGoalMinutes: Int { currentProgress.dailyGoalMinutes }
+    var totalPracticeTime: TimeInterval { currentProgress.totalPracticeTime }
+    var todaysPracticeTime: TimeInterval { TimeInterval(dailyProgress.practiceTimeMinutes) * 60 }
+    var progressToNextLevel: Double { Double(progressToNextLevelValue()) }
+    var totalLessonsCompleted: Int { computeTotalLessonsCompleted() }
+    var totalDaysPracticed: Int { computeTotalDaysPracticed() }
+    var totalPerfectNotes: Int { computeTotalPerfectNotes() }
+    var averageScore: Float { computeAverageScore() }
+    var recentAchievements: [Achievement] { Array(achievements.suffix(4)) }
+    var allAchievements: [Achievement] { mergeAchievements() }
     
     // MARK: - Private Properties
     private let coreDataManager: CoreDataManager
@@ -50,7 +68,7 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         let userProgress = coreDataManager.getUserProgress(for: userId)
         
         // Create score result entity
-        let scoreEntity = coreDataManager.saveScoreResult(score, for: lessonId, mode: .performance)
+        _ = coreDataManager.saveScoreResult(score, for: lessonId, mode: .performance)
         
         // Update user progress
         let oldLevel = Int(userProgress.currentLevel)
@@ -161,7 +179,7 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
             totalTrophies: Int(userProgress.totalTrophies),
             totalPracticeTime: userProgress.totalPracticeTime,
             starsToNextLevel: starsToNextLevel(),
-            progressToNextLevel: progressToNextLevel(),
+            progressToNextLevel: progressToNextLevelValue(),
             dailyGoalProgress: dailyGoalProgress(),
             recentAchievements: Array(achievements.suffix(3))
         )
@@ -229,15 +247,15 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         )
     }
     
-    private func getPerformanceMetrics() -> PerformanceMetrics {
+    private func getPerformanceMetrics() -> AnalyticsPerformanceMetrics {
         let scores = getRecentScores(limit: 100)
         
-        let averageScore = scores.isEmpty ? 0 : scores.reduce(0) { $0 + $1.totalScore } / Float(scores.count)
+        let averageScore = scores.isEmpty ? 0 : scores.reduce(Float(0)) { $0 + $1.totalScore } / Float(scores.count)
         let averageAccuracy = calculateAverageAccuracy(from: scores)
         let improvementRate = calculateImprovementRate(from: scores)
         let consistencyScore = calculateConsistencyScore(from: scores)
         
-        return PerformanceMetrics(
+        return AnalyticsPerformanceMetrics(
             averageScore: averageScore,
             averageAccuracy: averageAccuracy,
             improvementRate: improvementRate,
@@ -254,7 +272,7 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         
         return PracticePatterns(
             preferredPracticeTime: getMostActiveHour(from: hourlyDistribution),
-            averageSessionLength: sessionLengths.isEmpty ? 0 : sessionLengths.reduce(0, +) / sessionLengths.count,
+            averageSessionLength: sessionLengths.isEmpty ? TimeInterval(0) : sessionLengths.reduce(TimeInterval(0), +) / Double(sessionLengths.count),
             practiceFrequency: calculatePracticeFrequency(from: weeklyData),
             longestStreak: currentProgress.maxStreak,
             mostProductiveDay: getMostProductiveDay(from: weeklyData)
@@ -337,7 +355,7 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     private func calculateAverageAccuracy(from scores: [ScoreResult]) -> Float {
         guard !scores.isEmpty else { return 0 }
         
-        let totalAccuracy = scores.reduce(0.0) { total, score in
+        let totalAccuracy = scores.reduce(Float(0.0)) { total, score in
             let hits = score.timingResults.filter { $0.timing != .miss }.count
             let accuracy = Float(hits) / Float(score.timingResults.count)
             return total + accuracy
@@ -349,8 +367,8 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     private func calculateImprovementRate(from scores: [ScoreResult]) -> Float {
         guard scores.count >= 2 else { return 0 }
         
-        let recentAverage = scores.prefix(10).reduce(0) { $0 + $1.totalScore } / 10.0
-        let olderAverage = scores.suffix(10).reduce(0) { $0 + $1.totalScore } / 10.0
+        let recentAverage = scores.prefix(10).reduce(Float(0)) { $0 + $1.totalScore } / Float(10)
+        let olderAverage = scores.suffix(10).reduce(Float(0)) { $0 + $1.totalScore } / Float(10)
         
         return (recentAverage - olderAverage) / olderAverage
     }
@@ -358,8 +376,8 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     private func calculateConsistencyScore(from scores: [ScoreResult]) -> Float {
         guard scores.count >= 3 else { return 1.0 }
         
-        let average = scores.reduce(0) { $0 + $1.totalScore } / Float(scores.count)
-        let variance = scores.reduce(0) { total, score in
+        let average = scores.reduce(Float(0)) { $0 + $1.totalScore } / Float(scores.count)
+        let variance = scores.reduce(Float(0)) { total, score in
             let diff = score.totalScore - average
             return total + (diff * diff)
         } / Float(scores.count)
@@ -459,9 +477,56 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         return 75 // Placeholder
     }
     
+    // MARK: - Chart & Timeline Helpers
+    
+    func getChartData(for timeframe: ProgressTimeframe) -> [ChartDataPoint] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        let startDate: Date
+        switch timeframe {
+        case .week:
+            startDate = calendar.date(byAdding: .day, value: -6, to: today) ?? today
+        case .month:
+            startDate = calendar.date(byAdding: .day, value: -29, to: today) ?? today
+        case .year:
+            startDate = calendar.date(byAdding: .month, value: -11, to: today) ?? today
+        case .all:
+            startDate = Date.distantPast
+        }
+        
+        let request: NSFetchRequest<DailyProgress> = DailyProgress.fetchRequest()
+        request.predicate = NSPredicate(format: "userId == %@ AND date >= %@", userId, startDate as NSDate)
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \DailyProgress.date, ascending: true)]
+        
+        do {
+            let records = try coreDataManager.context.fetch(request)
+            return records.map { ChartDataPoint(date: $0.date, minutes: Int($0.practiceTimeMinutes)) }
+        } catch {
+            print("Error fetching chart data: \(error)")
+            return []
+        }
+    }
+    
+    func getCurrentWeekData() -> [WeekDayData] {
+        return getWeeklyProgress().map {
+            WeekDayData(
+                date: $0.date,
+                minutes: $0.practiceTimeMinutes,
+                practiced: $0.practiceTimeMinutes > 0,
+                goalMet: $0.goalAchieved
+            )
+        }
+    }
+    
     // MARK: - Private Methods
     
-    private func loadUserProgress() {
+    func loadUserProgress(context: NSManagedObjectContext? = nil) {
+        // 如果外部传入上下文，这里仅用于触发潜在的合并，不直接使用
+        if let providedContext = context {
+            coreDataManager.context.mergePolicy = providedContext.mergePolicy
+        }
+        
         let userProgress = coreDataManager.getUserProgress(for: userId)
         
         currentProgress = UserProgressData(
@@ -474,6 +539,9 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
             totalPracticeTime: userProgress.totalPracticeTime,
             lastPracticeDate: userProgress.lastPracticeDate
         )
+        
+        // 同步当日进度，避免界面显示过期数据
+        loadDailyProgress()
     }
     
     private func loadDailyProgress() {
@@ -565,17 +633,81 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         return max(0, nextLevelStars - currentProgress.totalStars)
     }
     
-    private func progressToNextLevel() -> Float {
+    private func progressToNextLevelValue() -> Float {
         let currentLevelStars = (currentProgress.currentLevel - 1) * starsPerLevel
         let nextLevelStars = currentProgress.currentLevel * starsPerLevel
         let progressStars = currentProgress.totalStars - currentLevelStars
         let totalStarsNeeded = nextLevelStars - currentLevelStars
         
+        guard totalStarsNeeded > 0 else { return 0 }
         return Float(progressStars) / Float(totalStarsNeeded)
     }
     
     private func dailyGoalProgress() -> Float {
+        guard currentProgress.dailyGoalMinutes > 0 else { return 0 }
         return Float(dailyProgress.practiceTimeMinutes) / Float(currentProgress.dailyGoalMinutes)
+    }
+    
+    // MARK: - Aggregate Calculations
+    
+    private func computeTotalLessonsCompleted() -> Int {
+        let request: NSFetchRequest<ScoreResultEntity> = ScoreResultEntity.fetchRequest()
+        do {
+            return try coreDataManager.context.count(for: request)
+        } catch {
+            print("Error counting lessons: \(error)")
+            return 0
+        }
+    }
+    
+    private func computeTotalDaysPracticed() -> Int {
+        let request: NSFetchRequest<DailyProgress> = DailyProgress.fetchRequest()
+        request.predicate = NSPredicate(format: "userId == %@ AND practiceTimeMinutes > 0", userId)
+        do {
+            return try coreDataManager.context.count(for: request)
+        } catch {
+            print("Error counting practiced days: \(error)")
+            return 0
+        }
+    }
+    
+    private func computeTotalPerfectNotes() -> Int {
+        return fetchScoreResults().reduce(0) { $0 + Int($1.perfectCount) }
+    }
+    
+    private func computeAverageScore() -> Float {
+        let results = fetchScoreResults()
+        guard !results.isEmpty else { return 0 }
+        let total = results.reduce(0) { $0 + $1.totalScore }
+        return total / Float(results.count)
+    }
+    
+    private func fetchScoreResults() -> [ScoreResultEntity] {
+        let request: NSFetchRequest<ScoreResultEntity> = ScoreResultEntity.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \ScoreResultEntity.completedAt, ascending: false)]
+        do {
+            return try coreDataManager.context.fetch(request)
+        } catch {
+            print("Error fetching score results: \(error)")
+            return []
+        }
+    }
+    
+    private func mergeAchievements() -> [Achievement] {
+        var merged = Dictionary(uniqueKeysWithValues: defaultAchievements().map { ($0.id, $0) })
+        achievements.forEach { merged[$0.id] = $0 }
+        return Array(merged.values)
+    }
+    
+    private func defaultAchievements() -> [Achievement] {
+        return [
+            Achievement.levelUp(level: 1),
+            Achievement.levelUp(level: 5),
+            Achievement.trophyMilestone(count: 1),
+            Achievement.perfectScore,
+            Achievement.streakMilestone(days: 3),
+            Achievement.starMilestone(count: 10)
+        ]
     }
 }
 
@@ -634,7 +766,7 @@ public struct DailyProgressData {
     }
 }
 
-public struct ProgressSummary {
+public struct ProgressSummary: Codable {
     let currentLevel: Int
     let totalStars: Int
     let currentStreak: Int
@@ -671,7 +803,7 @@ public struct MonthlyStats {
 
 // MARK: - Achievement System
 
-public struct Achievement: Identifiable, Equatable {
+public struct Achievement: Identifiable, Equatable, Codable {
     public let id: String
     public let title: String
     public let description: String
@@ -737,9 +869,22 @@ public struct Achievement: Identifiable, Equatable {
             category: .stars
         )
     }
+    
+    // MARK: - Computed Properties
+    
+    /// 根据成就类别返回对应的颜色
+    public var color: SwiftUI.Color {
+        return category.color
+    }
+    
+    /// 是否已解锁（目前默认都为已解锁，用于兼容旧 UI）
+    public var isUnlocked: Bool { true }
+    
+    /// 解锁时间（兼容 UI 所需字段）
+    public var unlockedDate: Date? { unlockedAt }
 }
 
-public enum AchievementCategory: String, CaseIterable {
+public enum AchievementCategory: String, CaseIterable, Codable {
     case level = "level"
     case trophy = "trophy"
     case performance = "performance"
@@ -755,19 +900,29 @@ public enum AchievementCategory: String, CaseIterable {
         case .stars: return "Stars"
         }
     }
+    
+    public var color: SwiftUI.Color {
+        switch self {
+        case .level: return .blue
+        case .trophy: return .yellow
+        case .performance: return .green
+        case .streak: return .orange
+        case .stars: return .purple
+        }
+    }
 }
 
 // MARK: - Advanced Analytics Data Structures
 
 public struct AdvancedAnalytics {
-    let performanceMetrics: PerformanceMetrics
+    let performanceMetrics: AnalyticsPerformanceMetrics
     let practicePatterns: PracticePatterns
     let skillProgression: SkillProgression
     let comparativeAnalysis: ComparativeAnalysis
     let recommendations: [Recommendation]
 }
 
-public struct PerformanceMetrics {
+public struct AnalyticsPerformanceMetrics {
     let averageScore: Float
     let averageAccuracy: Float
     let improvementRate: Float

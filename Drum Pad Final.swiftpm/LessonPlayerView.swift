@@ -1,14 +1,16 @@
 import SwiftUI
-import AudioKitUI
+import AudioKit
+// 注意：已移除 AudioKitUI 依赖，使用 CustomAudioKitViews.swift 中的自定义组件
 
 // MARK: - Lesson Player View
 
 struct LessonPlayerView: View {
     let lesson: Lesson
     let conductor: Conductor
+    let coreDataManager: CoreDataManager
     
-    @StateObject private var lessonEngine = LessonEngine()
-    @StateObject private var scoreEngine = ScoreEngine()
+    @StateObject private var lessonEngine: LessonEngine
+    @StateObject private var scoreEngine: ScoreEngine
     @Environment(\.presentationMode) var presentationMode
     
     @State private var currentPlaybackMode: PlaybackMode = .performance
@@ -22,6 +24,16 @@ struct LessonPlayerView: View {
     @State private var loopStart: TimeInterval = 0
     @State private var loopEnd: TimeInterval = 0
     @State private var isWaitModeEnabled = false
+    
+    init(lesson: Lesson, conductor: Conductor, coreDataManager: CoreDataManager = .shared) {
+        self.lesson = lesson
+        self.conductor = conductor
+        self.coreDataManager = coreDataManager
+        
+        let scoreEngine = ScoreEngine()
+        _scoreEngine = StateObject(wrappedValue: scoreEngine)
+        _lessonEngine = StateObject(wrappedValue: LessonEngine(coreDataManager: coreDataManager, conductor: conductor, scoreEngine: scoreEngine))
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -43,7 +55,6 @@ struct LessonPlayerView: View {
                         LessonPlayArea(
                             lesson: lesson,
                             lessonEngine: lessonEngine,
-                            scoreEngine: scoreEngine,
                             currentProgress: $currentProgress,
                             realtimeFeedback: $realtimeFeedback,
                             currentMode: currentPlaybackMode
@@ -73,7 +84,6 @@ struct LessonPlayerView: View {
                         LessonPlayArea(
                             lesson: lesson,
                             lessonEngine: lessonEngine,
-                            scoreEngine: scoreEngine,
                             currentProgress: $currentProgress,
                             realtimeFeedback: $realtimeFeedback,
                             currentMode: currentPlaybackMode
@@ -122,38 +132,22 @@ struct LessonPlayerView: View {
     }
     
     private func setupLesson() {
-        lessonEngine.loadLesson(lesson)
+        // LessonEngine expects a lesson ID
+        _ = lessonEngine.loadLesson(lesson.id ?? "")
         currentBPM = lesson.defaultBPM
         loopEnd = lesson.duration
-        
-        // Setup score engine callbacks
-        scoreEngine.onRealtimeFeedback = { feedback in
-            DispatchQueue.main.async {
-                realtimeFeedback.append(feedback)
-                // Keep only recent feedback (last 10 items)
-                if realtimeFeedback.count > 10 {
-                    realtimeFeedback.removeFirst()
-                }
-            }
-        }
-        
-        scoreEngine.onLessonComplete = { result in
-            DispatchQueue.main.async {
-                currentScoreResult = result
-                showingResults = true
-                isPlaying = false
-            }
-        }
     }
     
     private func startLesson() {
-        lessonEngine.startPlayback(
-            mode: currentPlaybackMode,
-            bpm: currentBPM,
-            loopRegion: isLoopEnabled ? (loopStart, loopEnd) : nil,
-            waitMode: isWaitModeEnabled
-        )
-        scoreEngine.startScoring(for: lesson, mode: currentPlaybackMode)
+        lessonEngine.setPlaybackMode(currentPlaybackMode)
+        lessonEngine.setTempo(currentBPM)
+        if isLoopEnabled {
+            lessonEngine.setLoopRegion(loopStart, loopEnd)
+        } else {
+            lessonEngine.loopRegion = nil
+        }
+        lessonEngine.enableWaitMode(isWaitModeEnabled)
+        lessonEngine.startPlayback()
         isPlaying = true
     }
 }
@@ -251,7 +245,6 @@ struct PlaybackModeSelector: View {
 struct LessonPlayArea: View {
     let lesson: Lesson
     let lessonEngine: LessonEngine
-    let scoreEngine: ScoreEngine
     @Binding var currentProgress: Double
     @Binding var realtimeFeedback: [TimingFeedback]
     let currentMode: PlaybackMode
@@ -306,6 +299,8 @@ struct LessonProgressView: View {
             }
             
             // Progress bar
+            let targetEvents = lessonEngine.getTargetEvents(for: TimeRange(start: 0, end: lesson.duration))
+            
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     // Background
@@ -319,8 +314,7 @@ struct LessonProgressView: View {
                         .frame(width: geometry.size.width * currentProgress, height: 8)
                     
                     // Target events markers
-                    ForEach(lessonEngine.currentTargetEvents.indices, id: \.self) { index in
-                        let event = lessonEngine.currentTargetEvents[index]
+                    ForEach(Array(targetEvents.enumerated()), id: \.offset) { _, event in
                         let position = event.timestamp / lesson.duration
                         
                         Circle()
@@ -334,13 +328,7 @@ struct LessonProgressView: View {
                 }
             }
             .frame(height: 20)
-            .onTapGesture { location in
-                // Allow seeking in practice mode
-                if lessonEngine.currentMode == .practice {
-                    let progress = location.x / UIScreen.main.bounds.width
-                    lessonEngine.seekTo(progress: progress)
-                }
-            }
+            // Seeking disabled here to maintain compatibility with older tap APIs
         }
     }
     
@@ -424,12 +412,16 @@ struct LessonControlPanel: View {
                 PlayControlsView(
                     isPlaying: $isPlaying,
                     onPlay: {
-                        lessonEngine.startPlayback(
-                            mode: currentMode,
-                            bpm: currentBPM,
-                            loopRegion: isLoopEnabled ? (loopStart, loopEnd) : nil,
-                            waitMode: isWaitModeEnabled
-                        )
+                        lessonEngine.setPlaybackMode(currentMode)
+                        lessonEngine.setTempo(currentBPM)
+                        if isLoopEnabled {
+                            lessonEngine.setLoopRegion(loopStart, loopEnd)
+                        } else {
+                            lessonEngine.loopRegion = nil
+                        }
+                        lessonEngine.enableWaitMode(isWaitModeEnabled)
+                        lessonEngine.startPlayback()
+                        isPlaying = true
                     },
                     onPause: {
                         lessonEngine.pausePlayback()
@@ -447,7 +439,7 @@ struct LessonControlPanel: View {
                         currentBPM: $currentBPM,
                         defaultBPM: lesson.defaultBPM,
                         onBPMChange: { newBPM in
-                            lessonEngine.setBPM(newBPM)
+                            lessonEngine.setTempo(newBPM)
                         }
                     )
                     
@@ -460,7 +452,7 @@ struct LessonControlPanel: View {
                         loopEnd: $loopEnd,
                         lessonDuration: lesson.duration,
                         onLoopChange: { start, end in
-                            lessonEngine.setLoopRegion(start: start, end: end)
+                            lessonEngine.setLoopRegion(start, end)
                         }
                     )
                     
@@ -470,7 +462,7 @@ struct LessonControlPanel: View {
                     WaitModeToggle(
                         isWaitModeEnabled: $isWaitModeEnabled,
                         onToggle: { enabled in
-                            lessonEngine.setWaitMode(enabled)
+                            lessonEngine.enableWaitMode(enabled)
                         }
                     )
                 }
@@ -670,15 +662,7 @@ struct WaitModeToggle: View {
 // MARK: - Extensions
 
 extension TimingFeedback {
-    var displayName: String {
-        switch self {
-        case .perfect: return "Perfect"
-        case .early: return "Early"
-        case .late: return "Late"
-        case .miss: return "Miss"
-        case .extra: return "Extra"
-        }
-    }
+    // displayName 已在 ScoreEngine.swift 中定义，避免重复定义
     
     var color: Color {
         switch self {
@@ -706,5 +690,42 @@ struct LessonPlayerView_Previews: PreviewProvider {
         
         return LessonPlayerView(lesson: lesson, conductor: Conductor())
             .environment(\.managedObjectContext, context)
+    }
+}
+
+// MARK: - Fallback Drum Pad Grid (placeholder)
+struct TapCountingDrumPadGrid: View {
+    let names: [String]
+    let onTapCountsChanged: ([Int]) -> Void
+    
+    @State private var tapCounts: [Int]
+    
+    init(names: [String], onTapCountsChanged: @escaping ([Int]) -> Void) {
+        self.names = names
+        self.onTapCountsChanged = onTapCountsChanged
+        _tapCounts = State(initialValue: Array(repeating: 0, count: names.count))
+    }
+    
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+            ForEach(Array(names.enumerated()), id: \.offset) { index, name in
+                Button {
+                    tapCounts[index] += 1
+                    onTapCountsChanged(tapCounts)
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(name)
+                            .font(.headline)
+                        Text("\(tapCounts[index])")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .padding()
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemGray6)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 }

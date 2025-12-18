@@ -2,13 +2,16 @@ import Foundation
 import CoreData
 import AVFoundation
 import Combine
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Content Manager Protocol
 
 protocol ContentManagerProtocol {
     func importMIDIFile(_ url: URL) async throws -> Lesson?
     func createCourse(title: String, lessons: [Lesson]) -> Course
-    func validateContent(_ content: LessonContent) -> ValidationResult
+    func validateContent(_ content: LessonContent) -> CMValidationResult
     func publishContent(_ content: LessonContent) async throws
     func exportContent(_ contentId: String) async throws -> URL
     func deleteContent(_ contentId: String) async throws
@@ -115,7 +118,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
                     source: .lesson(lesson)
                 )],
                 errors: [],
-                warnings: validationResult.warnings.map { .dataLoss }
+                warnings: validationResult.warnings.map { _ in .dataLoss }
             )
             
             return lesson
@@ -191,14 +194,14 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
     }
     
     private func createLessonSteps(from midiData: MIDIData, for lesson: Lesson) async throws {
-        // Group MIDI events by difficulty/complexity
+        // Group MIDI events by difficulty/complexity - 使用 ParsedMIDIEvent
         let eventGroups = groupEventsByComplexity(midiData.drumEvents)
         
         for (index, eventGroup) in eventGroups.enumerated() {
             let stepTitle = "Step \(index + 1)"
             let stepDescription = generateStepDescription(for: eventGroup, stepNumber: index + 1)
             
-            // Convert MIDI events to target events
+            // Convert ParsedMIDIEvent to target events
             let targetEvents = eventGroup.map { midiEvent in
                 TargetEvent(
                     timestamp: midiEvent.timestamp,
@@ -224,7 +227,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         }
     }
     
-    private func groupEventsByComplexity(_ events: [MIDIEvent]) -> [[MIDIEvent]] {
+    private func groupEventsByComplexity(_ events: [ParsedMIDIEvent]) -> [[ParsedMIDIEvent]] {
         // Sort events by timestamp
         let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
         
@@ -233,7 +236,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         let step1Count = totalEvents / 3
         let step2Count = totalEvents / 2
         
-        var groups: [[MIDIEvent]] = []
+        var groups: [[ParsedMIDIEvent]] = []
         
         // Step 1: First third of events (simplest)
         if step1Count > 0 {
@@ -292,7 +295,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         return min(5, max(1, difficulty))
     }
     
-    private func checkForPolyrhythm(_ events: [MIDIEvent]) -> Bool {
+    private func checkForPolyrhythm(_ events: [ParsedMIDIEvent]) -> Bool {
         // Simple polyrhythm detection: check for overlapping notes
         let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
         
@@ -309,7 +312,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         return false
     }
     
-    private func checkForFastPassages(_ events: [MIDIEvent]) -> Bool {
+    private func checkForFastPassages(_ events: [ParsedMIDIEvent]) -> Bool {
         // Check for rapid note sequences (< 0.25 seconds apart)
         let sortedEvents = events.sorted { $0.timestamp < $1.timestamp }
         
@@ -390,20 +393,22 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         let data = try Data(contentsOf: url)
         let jsonDrumData = try JSONDecoder().decode(JSONDrumData.self, from: data)
         
-        // Convert JSON drum data to MIDIData
+        // Convert JSON drum data to MIDIData - 使用 ParsedMIDIEvent
         let events = jsonDrumData.events.map { event in
-            MIDIEvent(
+            ParsedMIDIEvent(
                 timestamp: event.time,
                 noteNumber: mapDrumNameToMIDINote(event.drum),
                 velocity: event.velocity ?? 100,
-                channel: 9, // Standard drum channel
                 duration: event.duration
             )
         }
         
+        // 计算 microsecondsPerQuarter: 60,000,000 / BPM
+        let microsecondsPerQuarter = UInt32(60_000_000 / Double(jsonDrumData.bpm))
+        
         return MIDIData(
             drumEvents: events,
-            tempoEvents: [TempoEvent(timestamp: 0, bpm: jsonDrumData.bpm)],
+            tempoEvents: [TempoEvent(timestamp: 0, bpm: jsonDrumData.bpm, microsecondsPerQuarter: microsecondsPerQuarter)],
             timeSignature: jsonDrumData.timeSignature,
             totalDuration: jsonDrumData.duration
         )
@@ -413,8 +418,8 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         let xmlData = try Data(contentsOf: url)
         let xmlString = String(data: xmlData, encoding: .utf8) ?? ""
         
-        // Simple XML parsing for drum notation
-        var events: [MIDIEvent] = []
+        // Simple XML parsing for drum notation - 使用 ParsedMIDIEvent
+        var events: [ParsedMIDIEvent] = []
         var currentTime: TimeInterval = 0
         let bpm: Float = 120 // Default, could be parsed from XML
         
@@ -423,7 +428,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         for line in lines {
             if line.contains("<note>") {
                 // Extract note information from XML
-                if let noteEvent = parseXMLNote(line, currentTime: currentTime) {
+                if let noteEvent = parseXMLNoteParsed(line, currentTime: currentTime) {
                     events.append(noteEvent)
                 }
             }
@@ -433,9 +438,11 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
             }
         }
         
+        let microsecondsPerQuarter = UInt32(60_000_000 / Double(bpm))
+        
         return MIDIData(
             drumEvents: events,
-            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm)],
+            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm, microsecondsPerQuarter: microsecondsPerQuarter)],
             timeSignature: TimeSignature(numerator: 4, denominator: 4),
             totalDuration: currentTime
         )
@@ -447,20 +454,22 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         
         // Guitar Pro files have a specific binary format
         // This is a basic implementation that would need to be expanded
-        var events: [MIDIEvent] = []
+        var events: [ParsedMIDIEvent] = []
         let bpm: Float = 120
         
         // Look for drum track data in the binary file
         // Guitar Pro stores drum data in specific sections
         if let drumTrackData = extractDrumTrackFromGuitarPro(data) {
-            events = parseDrumTrackData(drumTrackData)
+            events = parseDrumTrackDataParsed(drumTrackData)
         }
+        
+        let microsecondsPerQuarter = UInt32(60_000_000 / Double(bpm))
         
         return MIDIData(
             drumEvents: events,
-            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm)],
+            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm, microsecondsPerQuarter: microsecondsPerQuarter)],
             timeSignature: TimeSignature(numerator: 4, denominator: 4),
-            totalDuration: calculateDuration(from: events)
+            totalDuration: calculateDurationFromParsed(from: events)
         )
     }
     
@@ -468,7 +477,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         // PowerTab files are also binary format
         let data = try Data(contentsOf: url)
         
-        var events: [MIDIEvent] = []
+        var events: [ParsedMIDIEvent] = []
         let bpm: Float = 120
         
         // PowerTab has a different binary structure than Guitar Pro
@@ -476,9 +485,11 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
             events = parsePowerTabDrumData(drumData)
         }
         
+        let microsecondsPerQuarter = UInt32(60_000_000 / Double(bpm))
+        
         return MIDIData(
             drumEvents: events,
-            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm)],
+            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm, microsecondsPerQuarter: microsecondsPerQuarter)],
             timeSignature: TimeSignature(numerator: 4, denominator: 4),
             totalDuration: calculateDuration(from: events)
         )
@@ -489,7 +500,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         let xmlData = try Data(contentsOf: url)
         let xmlString = String(data: xmlData, encoding: .utf8) ?? ""
         
-        var events: [MIDIEvent] = []
+        var events: [ParsedMIDIEvent] = []
         let bpm: Float = 120
         
         // Parse TuxGuitar XML format for drum tracks
@@ -497,9 +508,11 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
             events = parseTuxGuitarDrumTrack(drumTrackXML)
         }
         
+        let microsecondsPerQuarter = UInt32(60_000_000 / Double(bpm))
+        
         return MIDIData(
             drumEvents: events,
-            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm)],
+            tempoEvents: [TempoEvent(timestamp: 0, bpm: bpm, microsecondsPerQuarter: microsecondsPerQuarter)],
             timeSignature: TimeSignature(numerator: 4, denominator: 4),
             totalDuration: calculateDuration(from: events)
         )
@@ -523,7 +536,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         }
     }
     
-    private func parseXMLNote(_ line: String, currentTime: TimeInterval) -> MIDIEvent? {
+    private func parseXMLNote(_ line: String, currentTime: TimeInterval) -> ParsedMIDIEvent? {
         // Simplified XML note parsing
         // In a real implementation, you'd use a proper XML parser
         guard line.contains("drum") else { return nil }
@@ -531,13 +544,17 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         let noteNumber = 38 // Default snare
         let velocity = 100
         
-        return MIDIEvent(
+        return ParsedMIDIEvent(
             timestamp: currentTime,
             noteNumber: noteNumber,
             velocity: velocity,
-            channel: 9,
             duration: 0.1
         )
+    }
+    
+    // 别名函数用于兼容
+    private func parseXMLNoteParsed(_ line: String, currentTime: TimeInterval) -> ParsedMIDIEvent? {
+        return parseXMLNote(line, currentTime: currentTime)
     }
     
     private func parseDurationFromXML(_ line: String, bpm: Float) -> TimeInterval {
@@ -552,9 +569,14 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         return nil // Placeholder
     }
     
-    private func parseDrumTrackData(_ data: Data) -> [MIDIEvent] {
+    private func parseDrumTrackData(_ data: Data) -> [ParsedMIDIEvent] {
         // Parse drum track data from Guitar Pro format
         return [] // Placeholder
+    }
+    
+    // 别名函数用于兼容
+    private func parseDrumTrackDataParsed(_ data: Data) -> [ParsedMIDIEvent] {
+        return parseDrumTrackData(data)
     }
     
     private func extractDrumDataFromPowerTab(_ data: Data) -> Data? {
@@ -562,7 +584,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         return nil // Placeholder
     }
     
-    private func parsePowerTabDrumData(_ data: Data) -> [MIDIEvent] {
+    private func parsePowerTabDrumData(_ data: Data) -> [ParsedMIDIEvent] {
         // Parse PowerTab drum data
         return [] // Placeholder
     }
@@ -572,19 +594,24 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         return nil // Placeholder
     }
     
-    private func parseTuxGuitarDrumTrack(_ xmlString: String) -> [MIDIEvent] {
+    private func parseTuxGuitarDrumTrack(_ xmlString: String) -> [ParsedMIDIEvent] {
         // Parse TuxGuitar drum track XML
         return [] // Placeholder
     }
     
-    private func calculateDuration(from events: [MIDIEvent]) -> TimeInterval {
+    private func calculateDuration(from events: [ParsedMIDIEvent]) -> TimeInterval {
         guard let lastEvent = events.max(by: { $0.timestamp < $1.timestamp }) else {
             return 0
         }
         return lastEvent.timestamp + (lastEvent.duration ?? 0.1)
     }
     
-    private func generateStepDescription(for events: [MIDIEvent], stepNumber: Int) -> String {
+    // 别名函数用于兼容
+    private func calculateDurationFromParsed(from events: [ParsedMIDIEvent]) -> TimeInterval {
+        return calculateDuration(from: events)
+    }
+    
+    private func generateStepDescription(for events: [ParsedMIDIEvent], stepNumber: Int) -> String {
         let noteCount = events.count
         let uniqueNotes = Set(events.map { $0.noteNumber }).count
         
@@ -679,9 +706,9 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
     
     // MARK: - Content Validation
     
-    func validateContent(_ content: LessonContent) -> ValidationResult {
-        var errors: [ValidationError] = []
-        var warnings: [ValidationWarning] = []
+    func validateContent(_ content: LessonContent) -> CMValidationResult {
+        var errors: [CMValidationError] = []
+        var warnings: [CMValidationWarning] = []
         
         // Validate basic properties
         if content.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -728,7 +755,7 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
             warnings.append(.longDuration)
         }
         
-        return ValidationResult(
+        return CMValidationResult(
             isValid: errors.isEmpty,
             errors: errors,
             warnings: warnings
@@ -883,17 +910,21 @@ class ContentManager: ObservableObject, ContentManagerProtocol {
         var results: [String: ContentValidationResult] = [:]
         
         for lesson in lessons {
-            let content = LessonContent(
-                id: lesson.id,
-                title: lesson.title,
-                description: "",
-                bpm: lesson.defaultBPM,
-                duration: lesson.duration,
-                targetEvents: lesson.stepsArray.flatMap { $0.targetEvents },
-                tags: lesson.tagsArray
+            // 使用与 importMIDIFile 相同的验证方法
+            let validationResult = ContentValidationResult.validate(
+                ContentItem(
+                    id: lesson.id,
+                    title: lesson.title,
+                    description: "",
+                    type: .lesson,
+                    difficulty: DifficultyLevel(rawValue: Int(lesson.difficulty)) ?? .beginner,
+                    duration: lesson.duration,
+                    tags: Set(lesson.tagsArray),
+                    source: .lesson(lesson)
+                )
             )
             
-            results[lesson.id] = validateContent(content)
+            results[lesson.id] = validationResult
         }
         
         validationResults = results
@@ -913,13 +944,15 @@ struct LessonContent {
     let tags: [String]
 }
 
-struct ValidationResult {
+// 重命名为 CMValidationResult 避免与其他模块冲突
+struct CMValidationResult {
     let isValid: Bool
-    let errors: [ValidationError]
-    let warnings: [ValidationWarning]
+    let errors: [CMValidationError]
+    let warnings: [CMValidationWarning]
 }
 
-enum ValidationError: LocalizedError {
+// 重命名为 CMValidationError 避免与 DataModels.swift 中的 ValidationError 冲突
+enum CMValidationError: LocalizedError {
     case emptyTitle
     case invalidDuration
     case invalidBPM
@@ -939,7 +972,8 @@ enum ValidationError: LocalizedError {
     }
 }
 
-enum ValidationWarning: LocalizedError {
+// 重命名为 CMValidationWarning 避免冲突
+enum CMValidationWarning: LocalizedError {
     case noDescription
     case noTags
     case shortDuration
@@ -964,7 +998,7 @@ enum ContentImportError: LocalizedError {
     case unsupportedVersion
     case missingRequiredData
     case duplicateContent
-    case validationFailed([ValidationError])
+    case validationFailed([ContentValidationResult.ValidationError])
     
     var errorDescription: String? {
         switch self {
@@ -980,7 +1014,7 @@ enum ContentImportError: LocalizedError {
 }
 
 enum ContentPublishingError: LocalizedError {
-    case validationFailed([ValidationError])
+    case validationFailed([CMValidationError])
     case networkError
     case permissionDenied
     

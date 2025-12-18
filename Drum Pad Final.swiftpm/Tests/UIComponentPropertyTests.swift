@@ -212,9 +212,9 @@ private func createTestLesson(targetEvents: [TargetEvent]) -> Lesson {
     return lesson as! Lesson
 }
 
-private func generatePerfectPerformance(targetEvents: [TargetEvent]) -> [MIDIEvent] {
+private func generatePerfectPerformance(targetEvents: [TargetEvent]) -> [TestMIDIEvent] {
     return targetEvents.map { targetEvent in
-        MIDIEvent(
+        TestMIDIEvent(
             timestamp: targetEvent.timestamp,
             noteNumber: targetEvent.noteNumber,
             velocity: targetEvent.velocity ?? 100,
@@ -223,13 +223,13 @@ private func generatePerfectPerformance(targetEvents: [TargetEvent]) -> [MIDIEve
     }
 }
 
-private func generateMissedNotesPerformance(targetEvents: [TargetEvent], missRate: Double) -> [MIDIEvent] {
-    var userEvents: [MIDIEvent] = []
+private func generateMissedNotesPerformance(targetEvents: [TargetEvent], missRate: Double) -> [TestMIDIEvent] {
+    var userEvents: [TestMIDIEvent] = []
     
     for targetEvent in targetEvents {
         // Randomly miss notes based on miss rate
         if Double.random(in: 0...1) > missRate {
-            let userEvent = MIDIEvent(
+            let userEvent = TestMIDIEvent(
                 timestamp: targetEvent.timestamp,
                 noteNumber: targetEvent.noteNumber,
                 velocity: targetEvent.velocity ?? 100,
@@ -242,12 +242,12 @@ private func generateMissedNotesPerformance(targetEvents: [TargetEvent], missRat
     return userEvents
 }
 
-private func generateEarlyLatePerformance(targetEvents: [TargetEvent]) -> [MIDIEvent] {
+private func generateEarlyLatePerformance(targetEvents: [TargetEvent]) -> [TestMIDIEvent] {
     return targetEvents.map { targetEvent in
         // Add random timing offset (-50ms to +50ms)
         let timingOffset = Double.random(in: -0.05...0.05)
         
-        return MIDIEvent(
+        return TestMIDIEvent(
             timestamp: targetEvent.timestamp + timingOffset,
             noteNumber: targetEvent.noteNumber,
             velocity: targetEvent.velocity ?? 100,
@@ -256,7 +256,7 @@ private func generateEarlyLatePerformance(targetEvents: [TargetEvent]) -> [MIDIE
     }
 }
 
-private func generateExtraNotesPerformance(targetEvents: [TargetEvent]) -> [MIDIEvent] {
+private func generateExtraNotesPerformance(targetEvents: [TargetEvent]) -> [TestMIDIEvent] {
     var userEvents = generatePerfectPerformance(targetEvents: targetEvents)
     
     // Add some extra notes between target events
@@ -267,7 +267,7 @@ private func generateExtraNotesPerformance(targetEvents: [TargetEvent]) -> [MIDI
         
         // 30% chance to add an extra note
         if Double.random(in: 0...1) < 0.3 {
-            let extraEvent = MIDIEvent(
+            let extraEvent = TestMIDIEvent(
                 timestamp: midTime,
                 noteNumber: currentEvent.noteNumber,
                 velocity: 80,
@@ -280,7 +280,7 @@ private func generateExtraNotesPerformance(targetEvents: [TargetEvent]) -> [MIDI
     return userEvents.sorted { $0.timestamp < $1.timestamp }
 }
 
-private func calculateTimingResults(targetEvents: [TargetEvent], userEvents: [MIDIEvent]) -> [TimingResult] {
+private func calculateTimingResults(targetEvents: [TargetEvent], userEvents: [TestMIDIEvent]) -> [TimingResult] {
     var results: [TimingResult] = []
     
     for targetEvent in targetEvents {
@@ -314,11 +314,22 @@ private func calculateTimingResults(targetEvents: [TargetEvent], userEvents: [MI
             }
         }()
         
+        // 将 TestMIDIEvent 转换为 ScoreEngine 中的 MIDIEvent 类型
+        let scoreMIDIEvent: MIDIEvent? = closestUserEvent.map { testEvent in
+            MIDIEvent(
+                timestamp: testEvent.timestamp,
+                noteNumber: testEvent.noteNumber,
+                velocity: testEvent.velocity,
+                channel: 0
+            )
+        }
+        
         let result = TimingResult(
             targetEvent: targetEvent,
-            userEvent: closestUserEvent,
+            userEvent: scoreMIDIEvent,
             timing: timing,
-            score: score
+            score: score,
+            timestamp: closestUserEvent?.timestamp ?? targetEvent.timestamp
         )
         
         results.append(result)
@@ -327,7 +338,7 @@ private func calculateTimingResults(targetEvents: [TargetEvent], userEvents: [MI
     return results
 }
 
-private func findClosestUserEvent(to targetEvent: TargetEvent, in userEvents: [MIDIEvent], window: TimeInterval) -> MIDIEvent? {
+private func findClosestUserEvent(to targetEvent: TargetEvent, in userEvents: [TestMIDIEvent], window: TimeInterval) -> TestMIDIEvent? {
     let candidateEvents = userEvents.filter { userEvent in
         abs(userEvent.timestamp - targetEvent.timestamp) <= window &&
         userEvent.noteNumber == targetEvent.noteNumber
@@ -347,7 +358,8 @@ struct TestLesson {
     let targetEvents: [TargetEvent]
 }
 
-struct MIDIEvent {
+// 测试专用的 MIDI 事件结构体，避免与 ScoreEngine 中的 MIDIEvent 冲突
+struct TestMIDIEvent {
     let timestamp: TimeInterval
     let noteNumber: Int
     let velocity: Int
@@ -435,7 +447,7 @@ func testMemoryModeUnlockEdgeCases() async throws {
 @Test("Timing results with empty lesson")
 func testTimingResultsWithEmptyLesson() async throws {
     let emptyTargetEvents: [TargetEvent] = []
-    let emptyUserEvents: [MIDIEvent] = []
+    let emptyUserEvents: [TestMIDIEvent] = []
     
     let results = calculateTimingResults(
         targetEvents: emptyTargetEvents,
@@ -448,7 +460,7 @@ func testTimingResultsWithEmptyLesson() async throws {
 @Test("Timing results with no user input")
 func testTimingResultsWithNoUserInput() async throws {
     let targetEvents = generateTargetEvents(count: 5)
-    let emptyUserEvents: [MIDIEvent] = []
+    let emptyUserEvents: [TestMIDIEvent] = []
     
     let results = calculateTimingResults(
         targetEvents: targetEvents,

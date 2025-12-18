@@ -8,15 +8,15 @@ import PackageDescription
 import AppleProductTypes
 
 let package = Package(
-    name: "Drum Pad",
+    name: "FingerDrumHero",
     platforms: [
         .iOS("15.2")
     ],
     products: [
         .iOSApplication(
-            name: "Drum Pad",
+            name: "FingerDrumHero",
             targets: ["AppModule"],
-            bundleIdentifier: "com.audiokitpro.drumpadplaygrounds",
+            bundleIdentifier: "com.bugelife.fingerdrumhero",
             teamIdentifier: "9W69ZP8S5F",
             displayVersion: "1.0.1",
             bundleVersion: "3",

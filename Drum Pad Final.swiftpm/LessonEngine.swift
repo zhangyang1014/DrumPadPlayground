@@ -56,6 +56,8 @@ enum PlaybackState: String, CaseIterable {
 
 // MARK: - Lesson Engine Implementation
 
+import QuartzCore
+
 class LessonEngine: ObservableObject, LessonEngineProtocol {
     
     // MARK: - Published Properties
@@ -233,7 +235,7 @@ class LessonEngine: ObservableObject, LessonEngineProtocol {
             self.conductor.startScoringSession(targetEvents: eventsToScore, profile: scoringProfile)
             
             // Start playback timer
-            self.startTime = CACurrentMediaTime() - self.pausedTime
+        self.startTime = CACurrentMediaTime() - self.pausedTime
             self.playbackState = .playing
             
             self.startPlaybackTimer()
@@ -549,7 +551,7 @@ class LessonEngine: ObservableObject, LessonEngineProtocol {
         // Update step assist level if needed
         if step.assistLevelEnum != assistLevel {
             step.assistLevelEnum = assistLevel
-            try? coreDataManager.saveContext()
+            coreDataManager.save()
         }
     }
     

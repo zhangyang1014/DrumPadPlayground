@@ -160,7 +160,7 @@ struct ImportProgressView: View {
                 Spacer()
             }
             
-            ProgressView(value: progress)
+            SwiftUI.ProgressView(value: progress)
                 .progressViewStyle(LinearProgressViewStyle())
             
             Text("\(Int(progress * 100))% Complete")

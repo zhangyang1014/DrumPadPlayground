@@ -11,15 +11,15 @@ struct DrumSample {
         fileName = file
         midiNote = note
         
-        guard let url = Bundle.main.url(forResource: file, withExtension: "wav") else {
-            print("Could not find: \(file)")
+        guard let resourceURL = ResourceLoader.loadAudioFile(named: file) else {
             return
         }
         
         do {
-            audioFile = try AVAudioFile(forReading: url)
+            audioFile = try AVAudioFile(forReading: resourceURL)
         } catch {
-            print("Could not load: \(url)")
+            print("Could not load audio file: \(resourceURL)")
+            print("Error: \(error)")
         }
     }
 }

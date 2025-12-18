@@ -240,7 +240,7 @@ struct CloudKitDebuggingView: View {
             }
             
             if isLoading {
-                ProgressView("Processing...")
+                SwiftUI.ProgressView("Processing...")
                     .padding()
             }
             

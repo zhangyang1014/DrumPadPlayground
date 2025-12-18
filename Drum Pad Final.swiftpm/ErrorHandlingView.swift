@@ -348,11 +348,26 @@ struct ErrorLogView: View {
         NavigationView {
             List {
                 if errorPresenter.errorHistory.isEmpty {
-                    ContentUnavailableView(
-                        "No Errors Logged",
-                        systemImage: "checkmark.circle",
-                        description: Text("Your app is running smoothly!")
-                    )
+                    if #available(iOS 17, *) {
+                        ContentUnavailableView(
+                            "No Errors Logged",
+                            systemImage: "checkmark.circle",
+                            description: Text("Your app is running smoothly!")
+                        )
+                    } else {
+                        VStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("No Errors Logged")
+                                .font(.headline)
+                            Text("Your app is running smoothly!")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                    }
                 } else {
                     ForEach(errorPresenter.errorHistory.indices, id: \.self) { index in
                         let entry = errorPresenter.errorHistory[index]

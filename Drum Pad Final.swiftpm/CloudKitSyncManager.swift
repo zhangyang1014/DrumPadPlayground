@@ -17,7 +17,7 @@ protocol CloudKitSyncManagerProtocol {
 
 // MARK: - CloudKit Sync Status
 
-public enum CloudKitSyncStatus {
+public enum CloudKitSyncStatus: Equatable {
     case notStarted
     case syncing
     case synced
@@ -48,6 +48,26 @@ public enum CloudKitSyncStatus {
             return "iCloud account unavailable"
         case .networkUnavailable:
             return "Network unavailable"
+        }
+    }
+    
+    public var isSyncing: Bool {
+        if case .syncing = self { return true }
+        return false
+    }
+    
+    public static func == (lhs: CloudKitSyncStatus, rhs: CloudKitSyncStatus) -> Bool {
+        switch (lhs, rhs) {
+        case (.notStarted, .notStarted),
+             (.syncing, .syncing),
+             (.synced, .synced),
+             (.accountUnavailable, .accountUnavailable),
+             (.networkUnavailable, .networkUnavailable):
+            return true
+        case (.error(let le), .error(let re)):
+            return le.localizedDescription == re.localizedDescription
+        default:
+            return false
         }
     }
 }
@@ -91,7 +111,7 @@ public enum CloudKitSyncError: Error, LocalizedError {
 public class CloudKitSyncManager: ObservableObject, CloudKitSyncManagerProtocol {
     
     // MARK: - Published Properties
-    @Published private(set) var syncStatus: CloudKitSyncStatus = .notStarted
+    @Published var syncStatus: CloudKitSyncStatus = .notStarted
     
     // MARK: - Private Properties
     private let coreDataManager: CoreDataManager
@@ -123,7 +143,7 @@ public class CloudKitSyncManager: ObservableObject, CloudKitSyncManagerProtocol 
     // MARK: - Public Interface
     
     func startSync() {
-        guard syncStatus != .syncing else { return }
+        guard !syncStatus.isSyncing else { return }
         
         Task {
             await checkAndStartSync()
@@ -199,7 +219,7 @@ public class CloudKitSyncManager: ObservableObject, CloudKitSyncManagerProtocol 
     }
     
     private func performPeriodicSync() async {
-        guard syncStatus != .syncing else { return }
+        guard !syncStatus.isSyncing else { return }
         
         do {
             await MainActor.run {
@@ -218,7 +238,7 @@ public class CloudKitSyncManager: ObservableObject, CloudKitSyncManagerProtocol 
         }
     }
     
-    private func performFullSync() async throws {
+    func performFullSync() async throws {
         // Sync all entity types
         try await syncUserProgress()
         try await syncLessons()
