@@ -1,5 +1,60 @@
 import SwiftUI
 
+// MARK: - Color Extensions for Drum Pad Instruments
+
+extension Color {
+    /// 根据打击垫名称返回对应的乐器颜色
+    /// - Parameter padName: 打击垫名称
+    /// - Returns: 对应的颜色
+    static func drumPadColor(for padName: String) -> Color {
+        if padName.contains("KICK") {
+            return Color(red: 1.0, green: 0.42, blue: 0.21) // #FF6B35 橙色
+        } else if padName.contains("SNARE") {
+            return Color(red: 1.0, green: 0.42, blue: 0.62) // #FF6B9D 粉色
+        } else if padName.contains("HI HAT") || padName.contains("HAT") {
+            return Color(red: 0.58, green: 0.88, blue: 0.83) // #95E1D3 绿色
+        } else if padName.contains("TOM") {
+            return Color(red: 0.98, green: 0.78, blue: 0.31) // #F9C74F 黄色
+        } else if padName.contains("CRASH") || padName.contains("RIDE") {
+            return Color(red: 0.31, green: 0.80, blue: 0.77) // #4ECDC4 青色
+        } else {
+            // 其他特殊打击（RIM SHOT, SIDE STICK, OPEN HAT）
+            return Color(red: 0.58, green: 0.88, blue: 0.83) // 默认绿色
+        }
+    }
+    
+    /// 调整颜色亮度
+    /// - Parameter amount: 亮度调整量（-1.0 到 1.0，正值变亮，负值变暗）
+    /// - Returns: 调整后的颜色
+    func adjustedBrightness(_ amount: Double) -> Color {
+        // 使用 UIColor/NSColor 来调整 HSB 值
+        #if os(iOS)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        UIColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        // 调整亮度，确保在 0-1 范围内
+        let newBrightness = max(0, min(1, brightness + CGFloat(amount)))
+        
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(newBrightness), opacity: Double(alpha))
+        #else
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        NSColor(self).getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        let newBrightness = max(0, min(1, brightness + CGFloat(amount)))
+        
+        return Color(hue: Double(hue), saturation: Double(saturation), brightness: Double(newBrightness), opacity: Double(alpha))
+        #endif
+    }
+}
+
 // MARK: - Legacy Drum Pad View
 
 struct LegacyDrumPadView: View {
@@ -22,33 +77,36 @@ struct LegacyDrumPadView: View {
     // 第三行：特殊打击区域
     // 第四行：基础节奏区域
     private let drumPads = [
-        // 第一行：镲片
-        DrumPad(id: 0, name: "CRASH\nLEFT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "crash_F1"),
-        DrumPad(id: 1, name: "CRASH\nRIGHT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "crash_F1"),
-        DrumPad(id: 2, name: "RIDE", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "closed_hi_hat_F#1"),
-        DrumPad(id: 3, name: "RIDE\nBELL", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "open_hi_hat_A#1"),
+        // 第一行：镲片（青色系）
+        DrumPad(id: 0, name: "CRASH\nLEFT", color: .drumPadColor(for: "CRASH"), soundFile: "crash_F1"),
+        DrumPad(id: 1, name: "CRASH\nRIGHT", color: .drumPadColor(for: "CRASH"), soundFile: "crash_F1"),
+        DrumPad(id: 2, name: "RIDE", color: .drumPadColor(for: "RIDE"), soundFile: "closed_hi_hat_F#1"),
+        DrumPad(id: 3, name: "RIDE\nBELL", color: .drumPadColor(for: "RIDE"), soundFile: "open_hi_hat_A#1"),
         
-        // 第二行：通鼓
-        DrumPad(id: 4, name: "TOM 1", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "hi_tom_D2"),
-        DrumPad(id: 5, name: "TOM 2", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "mid_tom_B1"),
-        DrumPad(id: 6, name: "TOM 3", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "lo_tom_F1"),
-        DrumPad(id: 7, name: "TOM 4", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "lo_tom_F1"),
+        // 第二行：通鼓（黄色系）
+        DrumPad(id: 4, name: "TOM 1", color: .drumPadColor(for: "TOM"), soundFile: "hi_tom_D2"),
+        DrumPad(id: 5, name: "TOM 2", color: .drumPadColor(for: "TOM"), soundFile: "mid_tom_B1"),
+        DrumPad(id: 6, name: "TOM 3", color: .drumPadColor(for: "TOM"), soundFile: "lo_tom_F1"),
+        DrumPad(id: 7, name: "TOM 4", color: .drumPadColor(for: "TOM"), soundFile: "lo_tom_F1"),
         
-        // 第三行：特殊打击
-        DrumPad(id: 8, name: "KICK", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "bass_drum_C1"),
-        DrumPad(id: 9, name: "RIM\nSHOT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "clap_D#1"),
-        DrumPad(id: 10, name: "SIDE\nSTICK", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "snare_D1"),
-        DrumPad(id: 11, name: "OPEN\nHAT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "open_hi_hat_A#1"),
+        // 第三行：特殊打击（橙色、绿色系）
+        DrumPad(id: 8, name: "KICK", color: .drumPadColor(for: "KICK"), soundFile: "bass_drum_C1"),
+        DrumPad(id: 9, name: "RIM\nSHOT", color: .drumPadColor(for: "RIM SHOT"), soundFile: "clap_D#1"),
+        DrumPad(id: 10, name: "SIDE\nSTICK", color: .drumPadColor(for: "SIDE STICK"), soundFile: "snare_D1"),
+        DrumPad(id: 11, name: "OPEN\nHAT", color: .drumPadColor(for: "OPEN HAT"), soundFile: "open_hi_hat_A#1"),
         
-        // 第四行：基础节奏
-        DrumPad(id: 12, name: "KICK", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "bass_drum_C1"),
-        DrumPad(id: 13, name: "SNARE", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "snare_D1"),
-        DrumPad(id: 14, name: "HI HAT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "closed_hi_hat_F#1"),
-        DrumPad(id: 15, name: "HI HAT", color: Color(red: 0.8, green: 0.1, blue: 0.1), soundFile: "closed_hi_hat_F#1")
+        // 第四行：基础节奏（橙色、粉色、绿色系）
+        DrumPad(id: 12, name: "KICK", color: .drumPadColor(for: "KICK"), soundFile: "bass_drum_C1"),
+        DrumPad(id: 13, name: "SNARE", color: .drumPadColor(for: "SNARE"), soundFile: "snare_D1"),
+        DrumPad(id: 14, name: "HI HAT", color: .drumPadColor(for: "HI HAT"), soundFile: "closed_hi_hat_F#1"),
+        DrumPad(id: 15, name: "HI HAT", color: .drumPadColor(for: "HI HAT"), soundFile: "closed_hi_hat_F#1")
     ]
     
     var body: some View {
         VStack(spacing: 12) {
+            // 快速状态检查（可折叠）
+            QuickStatusView(conductor: conductor)
+            
             // 标题区域
             VStack(spacing: 4) {
                 Text("PAD SETUP TEMPLATE")
@@ -64,7 +122,7 @@ struct LegacyDrumPadView: View {
                     .foregroundColor(.secondary)
                 
                 Slider(value: $volume, in: 0...1, step: 0.05)
-                    .accentColor(Color(red: 0.8, green: 0.1, blue: 0.1))
+                    .accentColor(Color(red: 0.31, green: 0.80, blue: 0.77)) // 青色系，匹配镲片颜色
                 
                 Text("\(Int(volume * 100))%")
                     .font(.caption)
@@ -140,41 +198,89 @@ struct LegacyDrumPadView: View {
             }
             .padding(.horizontal, 8)
             
-            // 录制控制区域（紧凑版）
-            HStack(spacing: 20) {
+            // 录制控制区域（纯图标方形按钮，增强光影效果）
+            HStack(spacing: 16) {
                 // 录制按钮
                 Button(action: toggleRecording) {
-                    HStack(spacing: 4) {
-                        Image(systemName: isRecording ? "stop.circle.fill" : "record.circle")
-                        Text(isRecording ? "停止" : "录制")
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(isRecording ? .red : .blue)
+                    Image(systemName: isRecording ? "stop.fill" : "record.circle")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    (isRecording ? Color.red : Color.red.opacity(0.8)).adjustedBrightness(0.1),
+                                    isRecording ? Color.red : Color.red.opacity(0.8)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .padding(1)
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                        .shadow(color: Color.red.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
                 
                 // 清除按钮
                 Button(action: { recordedSequence.removeAll() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash")
-                        Text("清除")
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.orange)
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.orange.adjustedBrightness(0.1),
+                                    Color.orange
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .padding(1)
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                        .shadow(color: Color.orange.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
                 
                 // 回放按钮
                 Button(action: playbackSequence) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "play.fill")
-                        Text("回放")
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.green)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 60, height: 60)
+                        .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    (recordedSequence.isEmpty ? Color.gray : Color.green).adjustedBrightness(0.1),
+                                    recordedSequence.isEmpty ? Color.gray : Color.green
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .cornerRadius(14)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                .padding(1)
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                        .shadow(color: (recordedSequence.isEmpty ? Color.gray : Color.green).opacity(0.3), radius: 4, x: 0, y: 2)
                 }
                 .disabled(recordedSequence.isEmpty)
                 .opacity(recordedSequence.isEmpty ? 0.5 : 1.0)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             
             // 录制状态指示
             if isRecording {
@@ -204,6 +310,17 @@ struct LegacyDrumPadView: View {
             
             // 配置 LegacyAudioManager 以使用 Conductor
             LegacyAudioManager.shared.configure(with: conductor)
+            
+            // 仅在引擎确实未运行时才尝试启动（作为后备措施）
+            if !conductor.engine.avEngine.isRunning {
+                print("⚠️ LegacyDrumPadView: 音频引擎未运行，尝试启动（后备措施）...")
+                // 使用延迟调用避免阻塞 UI
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !conductor.engine.avEngine.isRunning {
+                        conductor.start()
+                    }
+                }
+            }
         }
         // 预设管理器面板
         .sheet(isPresented: $showingPresetManager) {
@@ -426,26 +543,64 @@ struct DrumPadButton: View {
     
     var body: some View {
         ZStack {
-            // 背景鼓垫 - 红色主题，带黑色边框
-            RoundedRectangle(cornerRadius: 10)
-                .fill(pad.color.opacity(isSelected ? 1.0 : 0.9))
+            // 背景鼓垫 - 动态颜色主题，增强光影效果
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            pad.color.opacity(isSelected ? 1.0 : 0.95).adjustedBrightness(0.15),  // 顶部高光
+                            pad.color.opacity(isSelected ? 1.0 : 0.95),                            // 中间原色
+                            pad.color.opacity(isSelected ? 0.95 : 0.9).adjustedBrightness(-0.1)   // 底部阴影
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .aspectRatio(1.0, contentMode: .fit)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(isLongPressing ? Color.blue : Color.black, lineWidth: isLongPressing ? 3 : 2)
+                    // 内部高光效果
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.3),
+                                    Color.clear
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .padding(2)
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(isLongPressing ? Color.blue : Color.black.opacity(0.15), lineWidth: isLongPressing ? 3 : 1)
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: isSelected ? 2 : 8, x: 0, y: isSelected ? 1 : 4)
+                .shadow(color: pad.color.opacity(0.3), radius: isSelected ? 0 : 4, x: 0, y: isSelected ? 0 : 2)  // 颜色光晕
                 .scaleEffect(isSelected ? 0.92 : 1.0)
                 .animation(.easeInOut(duration: 0.08), value: isSelected)
             
-            // 打击垫名称 - 白色粗体斜体文字
+            // 圆形波形可视化叠加层
+            CircularWaveformView(
+                energy: conductor.audioEnergy,
+                color: .white,
+                isActive: isSelected
+            )
+            .frame(width: 50, height: 50)
+            .allowsHitTesting(false)
+            
+            // 打击垫名称 - 白色粗体斜体文字，增大字号
             Text(pad.name)
-                .font(.system(size: 14, weight: .heavy, design: .default))
+                .font(.system(size: 18, weight: .heavy, design: .default))
                 .italic()
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.7)
                 .lineLimit(2)
                 .padding(4)
+                .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 2)
             
             // 设置图标（右上角）
             VStack {
@@ -464,6 +619,8 @@ struct DrumPadButton: View {
             // 点击手势 - 播放音色
             TapGesture()
                 .onEnded { _ in
+                    // 重置长按状态（修复：短点击时也要重置状态）
+                    isLongPressing = false
                     action()
                 }
         )
@@ -545,11 +702,102 @@ class LegacyAudioManager: ObservableObject {
         }
         
         // 播放音频，应用独立的音量控制
-        // volume 范围是 0.0-1.0，直接作为 velocity 参数传递
         conductor.playPad(padNumber: padIndex, velocity: Float(volume))
         
-        // 调试日志
         print("🎵 Playing: \(sampleName) (pad \(padIndex)) at volume: \(Int(volume * 100))%")
+    }
+}
+
+// MARK: - Quick Status View
+
+struct QuickStatusView: View {
+    let conductor: Conductor
+    @State private var isExpanded = false
+    
+    var isHealthy: Bool {
+        conductor.engine.avEngine.isRunning && conductor.drumSamples.count == 9
+    }
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Button(action: { withAnimation { isExpanded.toggle() } }) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(isHealthy ? Color.green : Color.red)
+                        .frame(width: 6, height: 6)
+                    
+                    Text(isHealthy ? "音频正常" : "音频异常")
+                        .font(.caption2)
+                        .foregroundColor(isHealthy ? .secondary : .red)
+                    
+                    Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(12)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("引擎:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(conductor.engine.avEngine.isRunning ? "✅ 运行" : "❌ 停止")
+                            .font(.caption2)
+                            .foregroundColor(conductor.engine.avEngine.isRunning ? .green : .red)
+                    }
+                    
+                    HStack {
+                        Text("样本:")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(conductor.drumSamples.count)/9")
+                            .font(.caption2)
+                            .foregroundColor(conductor.drumSamples.count == 9 ? .green : .red)
+                    }
+                    
+                    Divider()
+                    
+                    HStack(spacing: 6) {
+                        Button("重启") {
+                            conductor.engine.stop()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                conductor.start()
+                            }
+                        }
+                        .font(.caption2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
+                        
+                        Button("测试") {
+                            conductor.playPad(padNumber: 0, velocity: 1.0)
+                        }
+                        .font(.caption2)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundColor(.green)
+                        .cornerRadius(4)
+                    }
+                }
+                .padding(8)
+                .background(Color.secondary.opacity(0.05))
+                .cornerRadius(8)
+                .padding(.horizontal, 12)
+                .transition(.opacity)
+            }
+        }
+        .padding(.horizontal)
     }
 }
 

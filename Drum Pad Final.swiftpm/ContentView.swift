@@ -181,6 +181,7 @@ struct MainContentView: View {
                     FreePlayModeView(onBrowseLessons: {
                         selectedTab = .browse
                     })
+                    .environmentObject(conductor)
                 }
                 
             case .progress:

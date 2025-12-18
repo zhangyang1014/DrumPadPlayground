@@ -188,12 +188,17 @@ enum VelocityCurve: String, CaseIterable, Codable {
 
 class Conductor: ObservableObject {
     let engine = AudioEngine()
-    let drums = AppleSampler()
+    let drums = AppleSampler()  // 保留用于兼容，但不再使用
     let metronome = AppleSampler()
     let delay: Delay
     let reverb: Reverb
     let mixer = Mixer()
     let metronomeMixer = Mixer()
+    
+    // 使用独立的 AudioPlayer 数组替代 AppleSampler 的多样本映射
+    // 这是因为 AppleSampler.loadAudioFiles() 的 MIDI 映射机制有问题
+    private var drumPlayers: [AudioPlayer] = []
+    private let drumPlayersMixer = Mixer()
     
     // MIDI Input Management
     private var midiClient: MIDIClientRef = 0
@@ -232,7 +237,7 @@ class Conductor: ObservableObject {
     // MARK: - 实时音频能量分析（用于波形可视化）
     @Published var audioEnergy: Float = 0.0
     @Published var audioPeakLevel: Float = 0.0
-    private var audioTapInstalled: Bool = false
+    var audioTapInstalled: Bool = false
     
     // Metronome Properties
     @Published var isMetronomeEnabled: Bool = false {
@@ -334,10 +339,11 @@ class Conductor: ObservableObject {
     }
     
     init() {
-        delay = Delay(drums)
+        // 使用 drumPlayersMixer 作为信号源（替代有问题的 AppleSampler）
+        delay = Delay(drumPlayersMixer)
         reverb = Reverb(delay)
         
-        // Setup audio routing: drums -> delay -> reverb -> mixer
+        // Setup audio routing: drumPlayersMixer -> delay -> reverb -> mixer
         mixer.addInput(reverb)
         
         // Setup metronome routing: metronome -> metronomeMixer -> mixer
@@ -347,6 +353,9 @@ class Conductor: ObservableObject {
         engine.output = mixer
         
         drumPadTouchCounts = Array(repeating: 0, count: drumSamples.count)
+        
+        // 初始化 AudioPlayer 数组
+        initializeDrumPlayers()
         
         // initialize effects
         reverb.dryWetMix = reverbMix / 100.0
@@ -389,19 +398,57 @@ class Conductor: ObservableObject {
         scanForMIDIDevices()
     }
     
+    /// 初始化独立的 AudioPlayer 数组（替代 AppleSampler 的多样本机制）
+    private func initializeDrumPlayers() {
+        print("🎵 Conductor: 初始化 AudioPlayer 数组...")
+        
+        for (index, sample) in drumSamples.enumerated() {
+            if let audioFile = sample.audioFile {
+                do {
+                    let player = AudioPlayer(file: audioFile)
+                    player?.isLooping = false
+                    drumPlayers.append(player ?? AudioPlayer())
+                    drumPlayersMixer.addInput(player ?? AudioPlayer())
+                    print("✅ Conductor: 加载 AudioPlayer[\(index)] - \(sample.name)")
+                } catch {
+                    print("❌ Conductor: 无法创建 AudioPlayer[\(index)] - \(sample.name): \(error)")
+                    // 添加一个空的 player 保持索引一致
+                    drumPlayers.append(AudioPlayer())
+                }
+            } else {
+                print("⚠️ Conductor: 样本 \(sample.name) 没有音频文件")
+                drumPlayers.append(AudioPlayer())
+            }
+        }
+        
+        print("✅ Conductor: AudioPlayer 数组初始化完成，共 \(drumPlayers.count) 个")
+    }
+    
+    // 标记是否已经初始化，防止重复初始化
+    private var isInitialized = false
+    
     func start() {
+        // 防止重复初始化
+        guard !isInitialized else {
+            print("ℹ️ Conductor.start(): 已初始化，跳过重复调用")
+            
+            // 如果引擎没有运行，尝试重新启动
+            if !engine.avEngine.isRunning {
+                print("⚠️ Conductor.start(): 引擎未运行，尝试重新启动...")
+                do {
+                    try engine.start()
+                    print("✅ Conductor.start(): 引擎重新启动成功")
+                } catch {
+                    print("❌ Conductor.start(): 引擎重新启动失败 - \(error)")
+                }
+            }
+            return
+        }
+        
         print("🎵 Conductor.start(): 开始初始化音频系统...")
         
         // 配置音频会话（iOS 必需）
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try audioSession.setActive(true)
-            print("✅ Conductor: 音频会话已激活 (category: playback)")
-        } catch {
-            print("❌ Conductor: 音频会话配置失败 - \(error)")
-            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
-        }
+        configureAudioSession()
         
         // 启动音频引擎
         do {
@@ -414,17 +461,7 @@ class Conductor: ObservableObject {
             return
         }
         
-        // 加载鼓音频样本
-        do {
-            let files = drumSamples.compactMap { $0.audioFile }
-            print("🎵 Conductor: 正在加载 \(files.count) 个鼓音频样本...")
-            try drums.loadAudioFiles(files)
-            print("✅ Conductor: 鼓音频样本加载完成")
-        } catch {
-            Log("Could not load audio files \(error)")
-            print("❌ Conductor: 鼓音频样本加载失败 - \(error)")
-            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
-        }
+        print("🎵 Conductor: AudioPlayer 数组已初始化，共 \(drumPlayers.count) 个样本")
         
         // Load metronome sounds
         loadMetronomeSounds()
@@ -435,15 +472,43 @@ class Conductor: ObservableObject {
         // Measure audio latency
         measureAudioLatency()
         
-        // 安装音频分析 Tap（用于波形可视化）
-        setupAudioTap()
+        // 延迟安装音频分析 Tap（确保音频引擎完全启动）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.setupAudioTap()
+        }
+        
+        // 标记初始化完成
+        isInitialized = true
         
         print("✅ Conductor.start(): 音频系统初始化完成")
     }
     
+    /// 配置音频会话，单独抽取以提高可读性和错误处理
+    private func configureAudioSession() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            // 使用 .playAndRecord 以支持更稳定的音频处理，使用 .defaultToSpeaker 输出到扬声器
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            // 设置较低的延迟以提升性能
+            try audioSession.setPreferredIOBufferDuration(0.005) // 5ms
+            try audioSession.setActive(true)
+            print("✅ Conductor: 音频会话已激活 (category: playAndRecord, latency: 5ms)")
+        } catch {
+            print("❌ Conductor: 音频会话配置失败 - \(error)")
+            // 音频会话配置失败时回退到基础配置
+            do {
+                let audioSession = AVAudioSession.sharedInstance()
+                try audioSession.setCategory(.playback, mode: .default, options: [])
+                try audioSession.setActive(true)
+                print("⚠️ Conductor: 使用回退音频会话配置 (.playback)")
+            } catch {
+                print("❌ Conductor: 回退音频会话配置也失败 - \(error)")
+                errorPresenter?.presentError(.audioEngineFailure(underlying: error))
+            }
+        }
+    }
+    
     func playPad(padNumber: Int, velocity: Float = 1.0) {
-        print("🥁 Conductor.playPad: padNumber=\(padNumber), velocity=\(velocity)")
-        
         // 检查 padNumber 是否有效
         guard padNumber >= 0 && padNumber < drumSamples.count else {
             print("❌ Conductor.playPad: padNumber \(padNumber) 超出范围 (0..<\(drumSamples.count))")
@@ -475,12 +540,23 @@ class Conductor: ObservableObject {
         let finalVelocity = velocity * config.volume
         
         let sample = drumSamples[padNumber]
-        let midiNote = MIDINoteNumber(sample.midiNote)
-        let midiVelocity = MIDIVelocity(finalVelocity * 127.0)
         
-        print("🥁 Conductor.playPad: 播放 \(sample.name) - MIDI Note: \(midiNote), Velocity: \(midiVelocity), PadVolume: \(config.volume)")
-        drums.play(noteNumber: midiNote, velocity: midiVelocity)
-        print("✅ Conductor.playPad: drums.play() 已调用")
+        // 使用 AudioPlayer 替代 AppleSampler（修复多样本映射问题）
+        guard padNumber < drumPlayers.count else {
+            print("❌ Conductor.playPad: 没有对应的 AudioPlayer (padNumber: \(padNumber))")
+            return
+        }
+        
+        let player = drumPlayers[padNumber]
+        
+        // 设置播放音量（基于 velocity）
+        player.volume = finalVelocity
+        
+        // 从头开始播放
+        player.seek(time: 0)
+        player.play()
+        
+        print("🥁 Conductor.playPad: 播放 \(sample.name) - Volume: \(finalVelocity)")
     }
     
     // MARK: - Per-Pad Configuration Methods
@@ -1025,7 +1101,8 @@ class Conductor: ObservableObject {
     }
     
     private func playMetronomeClick() {
-        guard !engine.avEngine.isRunning || isMetronomeEnabled else { return }
+        // 确保音频引擎正在运行且节拍器已启用
+        guard engine.avEngine.isRunning && isMetronomeEnabled else { return }
         
         // Play the metronome sound
         let noteNumber: MIDINoteNumber = 60 // Middle C for metronome
@@ -1121,6 +1198,12 @@ class Conductor: ObservableObject {
             return
         }
         
+        // 确保音频引擎正在运行
+        guard engine.avEngine.isRunning else {
+            print("⚠️ Conductor: 音频引擎未运行，AudioTap 安装失败")
+            return
+        }
+        
         // 获取混音器的输出格式
         let format = mixer.avAudioNode.outputFormat(forBus: 0)
         
@@ -1132,13 +1215,18 @@ class Conductor: ObservableObject {
         
         print("🎤 Conductor: 正在安装 AudioTap (sampleRate: \(format.sampleRate), channels: \(format.channelCount))...")
         
-        // 安装 Tap 到混音器的输出
-        mixer.avAudioNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-            self?.processAudioBuffer(buffer)
+        // 使用 try-catch 保护 tap 安装
+        do {
+            // 安装 Tap 到混音器的输出
+            mixer.avAudioNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+                self?.processAudioBuffer(buffer)
+            }
+            
+            audioTapInstalled = true
+            print("✅ Conductor: AudioTap 安装成功")
+        } catch {
+            print("❌ Conductor: AudioTap 安装失败 - \(error)")
         }
-        
-        audioTapInstalled = true
-        print("✅ Conductor: AudioTap 安装成功")
     }
     
     /// 处理音频缓冲区，计算 RMS 能量和峰值
@@ -1184,12 +1272,17 @@ class Conductor: ObservableObject {
     }
     
     deinit {
+        print("🗑 Conductor: 开始清理资源...")
+        
         // Clean up audio tap
         removeAudioTap()
         
         // Clean up metronome timers
         stopMetronome()
         stopCountIn()
+        
+        // Stop audio engine before cleanup
+        engine.stop()
         
         // Clean up MIDI resources
         if midiInputPort != 0 {
@@ -1198,6 +1291,16 @@ class Conductor: ObservableObject {
         if midiClient != 0 {
             MIDIClientDispose(midiClient)
         }
+        
+        // Deactivate audio session
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            print("✅ Conductor: 音频会话已停用")
+        } catch {
+            print("⚠️ Conductor: 音频会话停用失败 - \(error)")
+        }
+        
+        print("✅ Conductor: 资源清理完成")
     }
 }
 

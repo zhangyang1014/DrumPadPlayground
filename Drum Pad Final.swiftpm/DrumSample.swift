@@ -12,15 +12,14 @@ struct DrumSample {
         midiNote = note
         
         guard let resourceURL = ResourceLoader.loadAudioFile(named: file) else {
+            print("⚠️ DrumSample: 找不到文件 \(file).wav")
             return
         }
         
         do {
             audioFile = try AVAudioFile(forReading: resourceURL)
         } catch {
-            print("Could not load audio file: \(resourceURL)")
-            print("Error: \(error)")
+            print("⚠️ DrumSample: 无法加载 \(resourceURL): \(error)")
         }
     }
 }
-
