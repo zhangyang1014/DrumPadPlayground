@@ -133,7 +133,7 @@ struct LessonPlayerView: View {
     
     private func setupLesson() {
         // LessonEngine expects a lesson ID
-        _ = lessonEngine.loadLesson(lesson.id ?? "")
+        _ = lessonEngine.loadLesson(lesson.id)
         currentBPM = lesson.defaultBPM
         loopEnd = lesson.duration
     }

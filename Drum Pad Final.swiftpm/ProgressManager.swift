@@ -121,23 +121,30 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     func updateStreak() {
         let userProgress = coreDataManager.getUserProgress(for: userId)
         let today = Calendar.current.startOfDay(for: Date())
-        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today)!
         
-        // Check if user practiced today
+        // 安全地获取昨天的日期
+        guard let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: today) else {
+            // 如果无法计算昨天的日期，只更新最后练习日期
+            userProgress.lastPracticeDate = Date()
+            coreDataManager.save()
+            return
+        }
+        
+        // 检查用户今天是否练习
         let todayProgress = getDailyProgressEntity(for: today)
         let yesterdayProgress = getDailyProgressEntity(for: yesterday)
         
         if todayProgress?.goalAchieved == true {
             if yesterdayProgress?.goalAchieved == true || userProgress.currentStreak == 0 {
-                // Continue or start streak
+                // 继续或开始连续练习
                 userProgress.currentStreak += 1
                 userProgress.maxStreak = max(userProgress.maxStreak, userProgress.currentStreak)
             }
         } else {
-            // Check if streak should be broken (if it's past midnight and no practice today)
+            // 检查是否应该中断连续练习（如果已过午夜且今天没有练习）
             let now = Date()
             let calendar = Calendar.current
-            if calendar.component(.hour, from: now) >= 1 { // Give 1 hour grace period
+            if calendar.component(.hour, from: now) >= 1 { // 给予1小时的宽限期
                 userProgress.currentStreak = 0
             }
         }
@@ -191,7 +198,20 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         var weeklyData: [DailyProgressData] = []
         
         for i in 0..<7 {
-            let date = calendar.date(byAdding: .day, value: -i, to: today)!
+            // 安全地获取日期，避免强制解包
+            guard let date = calendar.date(byAdding: .day, value: -i, to: today) else {
+                // 如果日期计算失败，使用今天作为备用
+                let fallbackDate = calendar.date(byAdding: .day, value: 0, to: today) ?? today
+                weeklyData.append(DailyProgressData(
+                    date: fallbackDate,
+                    practiceTimeMinutes: 0,
+                    goalAchieved: false,
+                    lessonsCompleted: 0,
+                    starsEarned: 0
+                ))
+                continue
+            }
+            
             let progress = getDailyProgressEntity(for: date)
             
             weeklyData.append(DailyProgressData(
@@ -407,7 +427,16 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     }
     
     private func getMostActiveHour(from distribution: [Int: TimeInterval]) -> Int {
-        return distribution.max(by: { $0.value < $1.value })?.key ?? 19 // Default to 7 PM
+        // 过滤出有效的练习时间数据（时间 > 0）
+        let validDistribution = distribution.filter { $0.value > 0 }
+        
+        // 如果没有有效数据，返回默认时间（晚上7点）
+        guard !validDistribution.isEmpty else {
+            return 19
+        }
+        
+        // 返回练习时间最长的小时
+        return validDistribution.max(by: { $0.value < $1.value })?.key ?? 19
     }
     
     private func calculatePracticeFrequency(from weeklyData: [DailyProgressData]) -> Float {
@@ -416,12 +445,27 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
     }
     
     private func getMostProductiveDay(from weeklyData: [DailyProgressData]) -> String {
-        let calendar = Calendar.current
+        // 过滤出有练习时间的数据
+        let validData = weeklyData.filter { $0.practiceTimeMinutes > 0 }
+        
+        // 如果没有有效数据，返回默认值
+        guard !validData.isEmpty else {
+            return "Monday"
+        }
+        
+        // 找到星星数最多的一天
+        guard let mostProductiveData = validData.max(by: { $0.starsEarned < $1.starsEarned }) else {
+            return "Monday"
+        }
+        
+        // 使用线程安全的方式格式化日期
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "EEEE"
+        dayFormatter.locale = Locale.current
         
-        let mostProductiveData = weeklyData.max(by: { $0.starsEarned < $1.starsEarned })
-        return mostProductiveData.map { dayFormatter.string(from: $0.date) } ?? "Monday"
+        // 确保日期有效后再格式化
+        let dateString = dayFormatter.string(from: mostProductiveData.date)
+        return dateString.isEmpty ? "Monday" : dateString
     }
     
     private func getDifficultyProgressionData() -> [DifficultyProgress] {
@@ -501,9 +545,12 @@ public class ProgressManager: ObservableObject, ProgressManagerProtocol {
         
         do {
             let records = try coreDataManager.context.fetch(request)
-            return records.map { ChartDataPoint(date: $0.date, minutes: Int($0.practiceTimeMinutes)) }
+            // 将记录转换为图表数据点
+            return records.map { record in
+                ChartDataPoint(date: record.date, minutes: Int(record.practiceTimeMinutes))
+            }
         } catch {
-            print("Error fetching chart data: \(error)")
+            print("获取图表数据时出错: \(error)")
             return []
         }
     }

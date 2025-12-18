@@ -73,6 +73,10 @@ struct ContentView: View {
         .sheet(item: $selectedLesson) { lesson in
             LessonPlayerView(lesson: lesson, conductor: conductor)
         }
+        // 全局错误处理 overlay
+        .overlay {
+            ErrorHandlingView(errorPresenter: ErrorPresenter.shared)
+        }
     }
 }
 
@@ -173,10 +177,10 @@ struct MainContentView: View {
                 if let lesson = selectedLesson {
                     LessonPlayerView(lesson: lesson, conductor: conductor)
                 } else {
-                    LessonSelectionPromptView {
-                        // Switch to browse tab to select a lesson
+                    // 自由演奏模式 - 没有选择课程时显示鼓垫
+                    FreePlayModeView(onBrowseLessons: {
                         selectedTab = .browse
-                    }
+                    })
                 }
                 
             case .progress:
@@ -190,6 +194,44 @@ struct MainContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Free Play Mode View
+
+struct FreePlayModeView: View {
+    let onBrowseLessons: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // 顶部提示栏 - 可以跳转到课程浏览
+            HStack {
+                Image(systemName: "music.note.list")
+                    .foregroundColor(.blue)
+                
+                Text("自由演奏模式")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Button(action: onBrowseLessons) {
+                    HStack(spacing: 4) {
+                        Text("选择课程学习")
+                            .font(.subheadline)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color("controlsBackground"))
+            
+            // 自由打鼓界面
+            LegacyDrumPadView()
+        }
+        .background(Color("background"))
     }
 }
 

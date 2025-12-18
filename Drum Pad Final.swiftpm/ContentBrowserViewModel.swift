@@ -52,7 +52,7 @@ class ContentBrowserViewModel: ObservableObject {
     
     // MARK: - Private Properties
     private var cancellables = Set<AnyCancellable>()
-    private var coreDataManager: CoreDataManager?
+    private let coreDataManager: CoreDataManager = .shared
     
     // MARK: - Initialization
     
@@ -85,15 +85,21 @@ class ContentBrowserViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    func loadContent(context: NSManagedObjectContext) {
+    func loadContent(context: NSManagedObjectContext? = nil) {
         isLoading = true
-        coreDataManager = CoreDataManager.shared
+        let contextToUse: NSManagedObjectContext? = context ?? coreDataManager.context
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        guard let contextToUse = contextToUse else {
+            isLoading = false
+            return
+        }
+        
+        // 在上下文队列内执行，避免跨线程访问导致崩溃
+        contextToUse.perform { [weak self] in
             guard let self = self else { return }
             
-            let lessons = self.fetchLessons(context: context)
-            let courses = self.fetchCourses(context: context)
+            let lessons = self.fetchLessons(context: contextToUse)
+            let courses = self.fetchCourses(context: contextToUse)
             
             let contentItems = lessons + courses
             let tags = self.extractTags(from: contentItems)
@@ -118,13 +124,17 @@ class ContentBrowserViewModel: ObservableObject {
     }
     
     func refreshContent() {
-        guard let context = coreDataManager?.context else { return }
-        loadContent(context: context)
+        loadContent(context: coreDataManager.context)
     }
     
     // MARK: - Private Methods
     
     private func fetchLessons(context: NSManagedObjectContext) -> [ContentItem] {
+        // 防御：若当前模型未包含 Lesson 实体则直接返回空，避免 entityForName 崩溃
+        guard context.persistentStoreCoordinator?.managedObjectModel.entitiesByName["Lesson"] != nil else {
+            print("Warning: Lesson entity not found in managed object model.")
+            return []
+        }
         let request: NSFetchRequest<Lesson> = Lesson.fetchRequest()
         request.sortDescriptors = [
             NSSortDescriptor(keyPath: \Lesson.difficulty, ascending: true),
@@ -152,6 +162,11 @@ class ContentBrowserViewModel: ObservableObject {
     }
     
     private func fetchCourses(context: NSManagedObjectContext) -> [ContentItem] {
+        // 防御：若当前模型未包含 Course 实体则直接返回空，避免 entityForName 崩溃
+        guard context.persistentStoreCoordinator?.managedObjectModel.entitiesByName["Course"] != nil else {
+            print("Warning: Course entity not found in managed object model.")
+            return []
+        }
         let request: NSFetchRequest<Course> = Course.fetchRequest()
         request.predicate = NSPredicate(format: "isPublished == YES")
         request.sortDescriptors = [
@@ -225,8 +240,6 @@ class ContentBrowserViewModel: ObservableObject {
     
     private func isBeginnerUser() -> Bool {
         // Check if user is a beginner based on their progress
-        guard let coreDataManager = coreDataManager else { return true }
-        
         let userProgress = coreDataManager.getUserProgress(for: "default_user")
         return userProgress.currentLevel <= 2 && userProgress.totalStars < 10
     }

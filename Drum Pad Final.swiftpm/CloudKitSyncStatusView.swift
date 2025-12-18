@@ -94,6 +94,9 @@ public struct CloudKitSyncStatusView: View {
                 switch status {
                 case .available:
                     coreDataManager.enableCloudKitSync()
+                case .temporarilyUnavailable:
+                    errorMessage = "iCloud is temporarily unavailable. Please try again later."
+                    showingErrorAlert = true
                 case .noAccount, .restricted:
                     showingAccountAlert = true
                 case .couldNotDetermine:
@@ -254,6 +257,9 @@ public struct DetailedCloudKitStatusView: View {
         case .available:
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
+        case .temporarilyUnavailable:
+            Image(systemName: "clock")
+                .foregroundColor(.orange)
         case .noAccount:
             Image(systemName: "person.crop.circle.badge.xmark")
                 .foregroundColor(.red)
@@ -273,6 +279,8 @@ public struct DetailedCloudKitStatusView: View {
         switch accountStatus {
         case .available:
             return "Signed in to iCloud"
+        case .temporarilyUnavailable:
+            return "iCloud temporarily unavailable"
         case .noAccount:
             return "Not signed in to iCloud"
         case .restricted:

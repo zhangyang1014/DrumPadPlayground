@@ -88,8 +88,18 @@ public class CoreDataManager: ObservableObject {
     
     // MARK: - Core Data Operations
     
+    private func hasPersistentStoreLoaded(for context: NSManagedObjectContext) -> Bool {
+        guard let stores = context.persistentStoreCoordinator?.persistentStores else { return false }
+        return !stores.isEmpty
+    }
+    
     func save() {
         let context = persistentContainer.viewContext
+        
+        guard hasPersistentStoreLoaded(for: context) else {
+            print("Core Data save skipped: persistent store not loaded yet.")
+            return
+        }
         
         if context.hasChanges {
             do {
@@ -109,6 +119,11 @@ public class CoreDataManager: ObservableObject {
     
     func saveWithoutSync() {
         let context = persistentContainer.viewContext
+        
+        guard hasPersistentStoreLoaded(for: context) else {
+            print("Core Data save skipped: persistent store not loaded yet.")
+            return
+        }
         
         if context.hasChanges {
             do {
@@ -569,7 +584,7 @@ public class CoreDataManager: ObservableObject {
     func importUserData(_ data: [String: Any]) throws {
         // Import user progress
         if let userProgressData = data["userProgress"] as? [[String: Any]] {
-            for progressDict in userProgressData {
+            for _ in userProgressData {
                 // Create or update user progress
                 // Implementation would depend on specific requirements
             }
@@ -577,7 +592,7 @@ public class CoreDataManager: ObservableObject {
         
         // Import score results
         if let scoresData = data["scoreResults"] as? [[String: Any]] {
-            for scoreDict in scoresData {
+            for _ in scoresData {
                 // Create or update score results
                 // Implementation would depend on specific requirements
             }

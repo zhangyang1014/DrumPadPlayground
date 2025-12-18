@@ -194,6 +194,8 @@ public class CloudKitSyncManager: ObservableObject, CloudKitSyncManagerProtocol 
             switch accountStatus {
             case .available:
                 self.syncStatus = .syncing
+            case .temporarilyUnavailable:
+                self.syncStatus = .accountUnavailable
             case .noAccount, .restricted:
                 self.syncStatus = .accountUnavailable
                 return

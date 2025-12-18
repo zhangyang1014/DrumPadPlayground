@@ -6,6 +6,7 @@ import CoreData
 struct ContentBrowserView: View {
     @StateObject private var viewModel = ContentBrowserViewModel()
     @Environment(\.managedObjectContext) private var viewContext
+    @State private var showingContentCreation = false
     
     var body: some View {
         NavigationView {
@@ -18,8 +19,18 @@ struct ContentBrowserView: View {
             }
             .navigationTitle("Browse Content")
             .navigationBarTitleDisplayMode(.large)
+            .navigationBarItems(
+                trailing: Button(action: { showingContentCreation = true }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
+            )
             .onAppear {
                 viewModel.loadContent(context: viewContext)
+            }
+            .sheet(isPresented: $showingContentCreation) {
+                ContentCreationView()
             }
         }
     }

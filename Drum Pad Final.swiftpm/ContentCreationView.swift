@@ -7,6 +7,7 @@ struct ContentCreationView: View {
     @StateObject private var contentManager = ContentManager(coreDataManager: CoreDataManager.shared)
     @State private var showingFilePicker = false
     @State private var showingCourseCreator = false
+    @State private var showingContentValidation = false
     @State private var selectedLessons: Set<String> = []
     @Environment(\.presentationMode) var presentationMode
     
@@ -86,6 +87,34 @@ struct ContentCreationView: View {
                         .cornerRadius(12)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    
+                    // Content Validation Button
+                    Button {
+                        showingContentValidation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "checkmark.shield")
+                                .font(.title2)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Validate Content")
+                                    .font(.headline)
+                                
+                                Text("Check lessons and courses for issues")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 .padding(.horizontal)
                 
@@ -123,6 +152,9 @@ struct ContentCreationView: View {
         }
         .sheet(isPresented: $showingCourseCreator) {
             CourseCreationView(contentManager: contentManager)
+        }
+        .sheet(isPresented: $showingContentValidation) {
+            ContentValidationView(contentManager: contentManager)
         }
     }
     

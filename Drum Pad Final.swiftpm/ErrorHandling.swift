@@ -642,13 +642,26 @@ public struct DataIntegrityIssue {
 // MARK: - User-Friendly Error Presenter
 
 public class ErrorPresenter: ObservableObject {
+    // MARK: - Singleton
+    public static let shared = ErrorPresenter()
+    
     @Published public var currentError: DrumTrainerError?
     @Published public var isShowingError: Bool = false
     @Published public var errorHistory: [ErrorLogEntry] = []
     
-    private let recoveryManager: ErrorRecoveryManager
+    private var recoveryManager: ErrorRecoveryManager?
+    
+    /// 便捷初始化器，用于创建不带恢复功能的轻量实例
+    public init() {
+        self.recoveryManager = nil
+    }
     
     public init(recoveryManager: ErrorRecoveryManager) {
+        self.recoveryManager = recoveryManager
+    }
+    
+    /// 配置恢复管理器（可以在 App 启动后调用）
+    public func configure(recoveryManager: ErrorRecoveryManager) {
         self.recoveryManager = recoveryManager
     }
     
@@ -678,6 +691,11 @@ public class ErrorPresenter: ObservableObject {
     
     public func attemptRecovery() async {
         guard let error = currentError else { return }
+        guard let recoveryManager = recoveryManager else {
+            // 没有配置恢复管理器，只能关闭错误提示
+            dismissError()
+            return
+        }
         
         if recoveryManager.canRecover(from: error) {
             do {

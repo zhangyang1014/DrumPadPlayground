@@ -141,6 +141,13 @@ struct SettingsView: View {
                     .foregroundColor(.red)
                 }
                 
+                // Developer Tools section
+                Section("Developer Tools") {
+                    NavigationLink("Performance Monitor") {
+                        PerformanceMonitorView(performanceMonitor: PerformanceMonitor.shared)
+                    }
+                }
+                
                 // About section
                 Section("About") {
                     HStack {
@@ -805,7 +812,7 @@ struct LatencyTestView: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
             
-            ProgressView(value: latencyTestManager.testProgress, total: 1.0)
+            SwiftUI.ProgressView(value: latencyTestManager.testProgress, total: 1.0)
                 .progressViewStyle(LinearProgressViewStyle())
             
             Button("Tap Now!") {
@@ -983,9 +990,6 @@ class LatencyTestManager: ObservableObject {
     
     private func completeTest() {
         isTestRunning = false
-        
-        // Calculate average latency
-        let averageLatency = testResults.reduce(0, +) / Double(testResults.count)
         
         // Remove outliers (values more than 2 standard deviations from mean)
         let filteredResults = removeOutliers(from: testResults)

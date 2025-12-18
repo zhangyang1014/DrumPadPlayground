@@ -5,12 +5,35 @@ import QuartzCore // for CACurrentMediaTime
 // MARK: - Scoring Data Models
 
 struct TargetEvent: Codable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let timestamp: TimeInterval
     let laneId: String
     let noteNumber: Int
     let velocity: Int?
     let duration: TimeInterval?
+    
+    init(id: UUID = UUID(), timestamp: TimeInterval, laneId: String, noteNumber: Int, velocity: Int?, duration: TimeInterval?) {
+        self.id = id
+        self.timestamp = timestamp
+        self.laneId = laneId
+        self.noteNumber = noteNumber
+        self.velocity = velocity
+        self.duration = duration
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, timestamp, laneId, noteNumber, velocity, duration
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        timestamp = try container.decode(TimeInterval.self, forKey: .timestamp)
+        laneId = try container.decode(String.self, forKey: .laneId)
+        noteNumber = try container.decode(Int.self, forKey: .noteNumber)
+        velocity = try container.decodeIfPresent(Int.self, forKey: .velocity)
+        duration = try container.decodeIfPresent(TimeInterval.self, forKey: .duration)
+    }
 }
 
 struct MIDIEvent: Codable {
@@ -58,12 +81,35 @@ enum TimingFeedback: String, Codable, CaseIterable {
 }
 
 struct TimingResult: Codable, Identifiable {
-    let id = UUID()
+    let id: UUID
     let targetEvent: TargetEvent
     let userEvent: MIDIEvent?
     let timing: TimingFeedback
     let score: Float
     let timestamp: TimeInterval
+    
+    init(id: UUID = UUID(), targetEvent: TargetEvent, userEvent: MIDIEvent?, timing: TimingFeedback, score: Float, timestamp: TimeInterval) {
+        self.id = id
+        self.targetEvent = targetEvent
+        self.userEvent = userEvent
+        self.timing = timing
+        self.score = score
+        self.timestamp = timestamp
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, targetEvent, userEvent, timing, score, timestamp
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        targetEvent = try container.decode(TargetEvent.self, forKey: .targetEvent)
+        userEvent = try container.decodeIfPresent(MIDIEvent.self, forKey: .userEvent)
+        timing = try container.decode(TimingFeedback.self, forKey: .timing)
+        score = try container.decode(Float.self, forKey: .score)
+        timestamp = try container.decode(TimeInterval.self, forKey: .timestamp)
+    }
 }
 
 struct ScoreResult: Codable {

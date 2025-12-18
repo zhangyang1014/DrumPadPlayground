@@ -190,6 +190,8 @@ public class CloudKitConfiguration {
         switch accountStatus {
         case .available:
             print("✓ CloudKit account is available")
+        case .temporarilyUnavailable:
+            throw CloudKitConfigurationError.accountStatusUnknown
         case .noAccount:
             throw CloudKitConfigurationError.noAccount
         case .restricted:

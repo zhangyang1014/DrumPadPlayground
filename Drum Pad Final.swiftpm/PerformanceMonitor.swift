@@ -63,13 +63,16 @@ struct PerformanceMetrics {
 // MARK: - Performance Monitor
 
 class PerformanceMonitor: ObservableObject {
+    // MARK: - Singleton
+    static let shared = PerformanceMonitor()
+    
     @Published var currentMetrics: PerformanceMetrics?
     @Published var isMonitoring: Bool = false
     @Published var performanceHistory: [PerformanceMetrics] = []
     @Published var optimizationRecommendations: [OptimizationRecommendation] = []
     
     private var monitoringTimer: Timer?
-    private var audioEngine: AudioEngine?
+    private var isAudioEngineConfigured: Bool = false
     private var conductor: Conductor?
     
     // Performance tracking
@@ -87,7 +90,9 @@ class PerformanceMonitor: ObservableObject {
     // MARK: - Public Interface
     
     func startMonitoring(audioEngine: AudioEngine, conductor: Conductor) {
-        self.audioEngine = audioEngine
+        // 标记音频引擎已配置（audioEngine 参数用于验证调用者已正确设置）
+        _ = audioEngine // 确认 audioEngine 参数被使用
+        self.isAudioEngineConfigured = true
         self.conductor = conductor
         
         guard !isMonitoring else { return }
@@ -197,7 +202,8 @@ class PerformanceMonitor: ObservableObject {
     }
     
     private func measureAudioLatency() -> TimeInterval {
-        guard let audioEngine = audioEngine else { return 0.0 }
+        // 确保音频引擎已配置
+        guard isAudioEngineConfigured else { return 0.0 }
         
         let audioSession = AVAudioSession.sharedInstance()
         let bufferDuration = audioSession.ioBufferDuration
@@ -467,12 +473,10 @@ public struct OptimizationRecommendation: Identifiable, Equatable {
 class PerformanceOptimizer {
     private let performanceMonitor: PerformanceMonitor
     private let conductor: Conductor
-    private let audioEngine: AudioEngine
     
-    init(performanceMonitor: PerformanceMonitor, conductor: Conductor, audioEngine: AudioEngine) {
+    init(performanceMonitor: PerformanceMonitor, conductor: Conductor) {
         self.performanceMonitor = performanceMonitor
         self.conductor = conductor
-        self.audioEngine = audioEngine
     }
     
     func applyAutomaticOptimizations() {

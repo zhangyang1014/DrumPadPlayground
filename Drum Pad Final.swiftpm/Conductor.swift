@@ -207,6 +207,17 @@ class Conductor: ObservableObject {
     // Error Handling
     @Published var errorPresenter: ErrorPresenter?
     
+    // MARK: - Per-Pad Configuration Support
+    
+    /// Pad配置管理器（引用单例）
+    private let configManager = PadConfigurationManager.shared
+    
+    /// 当前pad配置数组（16个）
+    @Published var padConfigurations: [PadConfiguration] = []
+    
+    /// 上一次播放的pad ID（用于效果器参数缓存优化）
+    private var lastPlayedPadId: Int = -1
+    
     // Metronome Management
     private var metronomeTimer: Timer?
     private var countInTimer: Timer?
@@ -217,6 +228,11 @@ class Conductor: ObservableObject {
     @Published var currentMidiMapping: MIDIMapping = MIDIMapping.defaultMapping()
     @Published var detectedDevices: [MIDIDeviceInfo] = []
     @Published var audioLatency: TimeInterval = 0.0
+    
+    // MARK: - 实时音频能量分析（用于波形可视化）
+    @Published var audioEnergy: Float = 0.0
+    @Published var audioPeakLevel: Float = 0.0
+    private var audioTapInstalled: Bool = false
     
     // Metronome Properties
     @Published var isMetronomeEnabled: Bool = false {
@@ -241,22 +257,27 @@ class Conductor: ObservableObject {
     }
     @Published var countInSettings: CountInSettings = CountInSettings.defaultSettings()
     
+    // 鼓样本配置 - 支持 4x4 打击垫布局
+    // 包含所有基础鼓声音，每个样本对应一个唯一的 MIDI 音符
     let drumSamples: [DrumSample] = 
     [
-        DrumSample("HI TOM", file: "hi_tom_D2", note: 38),
-        DrumSample("CRASH", file: "crash_F1", note: 29),
-        DrumSample("HI HAT", file: "closed_hi_hat_F#1", note: 30),
-        DrumSample("OPEN HI HAT", file: "open_hi_hat_A#1", note: 34),
-        DrumSample("LO TOM", file: "mid_tom_B1", note: 35),
-        DrumSample("CLAP", file: "clap_D#1", note: 27),
-        DrumSample("KICK", file: "bass_drum_C1", note: 24),
-        DrumSample("SNARE", file: "snare_D1", note: 26),
+        DrumSample("KICK", file: "bass_drum_C1", note: 36),        // C2 - 底鼓
+        DrumSample("SNARE", file: "snare_D1", note: 38),           // D2 - 军鼓
+        DrumSample("HI HAT", file: "closed_hi_hat_F#1", note: 42), // F#2 - 闭合踩镲
+        DrumSample("OPEN HI HAT", file: "open_hi_hat_A#1", note: 46), // A#2 - 开放踩镲
+        DrumSample("CRASH", file: "crash_F1", note: 49),           // C#3 - Crash 镲
+        DrumSample("HI TOM", file: "hi_tom_D2", note: 50),         // D3 - 高音通鼓
+        DrumSample("MID TOM", file: "mid_tom_B1", note: 47),       // B2 - 中音通鼓
+        DrumSample("LO TOM", file: "lo_tom_F1", note: 43),         // G2 - 低音通鼓
+        DrumSample("CLAP", file: "clap_D#1", note: 39),            // D#2 - 拍手
     ]
     
     var drumPadTouchCounts: [Int] = [] {
-        willSet {
-            for index in 0..<drumPadTouchCounts.count {
-                if newValue[index] > drumPadTouchCounts[index] {
+        didSet {
+            let count = min(drumPadTouchCounts.count, oldValue.count)
+            guard count > 0 else { return }
+            for index in 0..<count {
+                if drumPadTouchCounts[index] > oldValue[index] {
                     playPad(padNumber: index)
                 }
             }
@@ -333,24 +354,75 @@ class Conductor: ObservableObject {
         delay.feedback = delayFeedback
         metronomeMixer.volume = metronomeVolume / 100.0
         
+        // Initialize pad configurations from manager
+        padConfigurations = configManager.getCurrentConfiguration()
+        
+        // 如果配置为空，初始化为默认配置
+        if padConfigurations.isEmpty {
+            padConfigurations = (0..<16).map { PadConfiguration.defaultConfiguration(for: $0) }
+            configManager.currentConfigurations = padConfigurations
+        }
+        
+        // 监听配置更新通知
+        NotificationCenter.default.addObserver(
+            forName: .padConfigurationUpdated,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let config = notification.object as? PadConfiguration {
+                self?.updatePadConfiguration(config)
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .padPresetApplied,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let preset = notification.object as? DrumPadPreset {
+                self?.applyPreset(preset)
+            }
+        }
+        
         // Initialize MIDI
         setupMIDIClient()
         scanForMIDIDevices()
     }
     
     func start() {
+        print("🎵 Conductor.start(): 开始初始化音频系统...")
+        
+        // 配置音频会话（iOS 必需）
         do {
-            try engine.start() 
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try audioSession.setActive(true)
+            print("✅ Conductor: 音频会话已激活 (category: playback)")
+        } catch {
+            print("❌ Conductor: 音频会话配置失败 - \(error)")
+            errorPresenter?.presentError(.audioEngineFailure(underlying: error))
+        }
+        
+        // 启动音频引擎
+        do {
+            try engine.start()
+            print("✅ Conductor: AudioEngine 已启动 (running: \(engine.avEngine.isRunning))")
         } catch {
             Log("AudioKit did not start! \(error)")
+            print("❌ Conductor: AudioEngine 启动失败 - \(error)")
             errorPresenter?.presentError(.audioEngineFailure(underlying: error))
             return
         }
+        
+        // 加载鼓音频样本
         do {
             let files = drumSamples.compactMap { $0.audioFile }
+            print("🎵 Conductor: 正在加载 \(files.count) 个鼓音频样本...")
             try drums.loadAudioFiles(files)
+            print("✅ Conductor: 鼓音频样本加载完成")
         } catch {
             Log("Could not load audio files \(error)")
+            print("❌ Conductor: 鼓音频样本加载失败 - \(error)")
             errorPresenter?.presentError(.audioEngineFailure(underlying: error))
         }
         
@@ -362,14 +434,130 @@ class Conductor: ObservableObject {
         
         // Measure audio latency
         measureAudioLatency()
+        
+        // 安装音频分析 Tap（用于波形可视化）
+        setupAudioTap()
+        
+        print("✅ Conductor.start(): 音频系统初始化完成")
     }
     
     func playPad(padNumber: Int, velocity: Float = 1.0) {
+        print("🥁 Conductor.playPad: padNumber=\(padNumber), velocity=\(velocity)")
+        
+        // 检查 padNumber 是否有效
+        guard padNumber >= 0 && padNumber < drumSamples.count else {
+            print("❌ Conductor.playPad: padNumber \(padNumber) 超出范围 (0..<\(drumSamples.count))")
+            return
+        }
+        
+        // 确保音频引擎正在运行
         if !engine.avEngine.isRunning {
+            print("⚠️ Conductor.playPad: AudioEngine 未运行，正在启动...")
             start()
         }
-        drums.play(noteNumber: MIDINoteNumber(drumSamples[padNumber].midiNote),
-                   velocity: MIDIVelocity(velocity * 127.0))
+        
+        // 获取pad配置
+        let config = getPadConfiguration(for: padNumber)
+        
+        // 检查是否静音
+        guard !config.isMuted else {
+            print("🔇 Conductor.playPad: Pad #\(padNumber) 已静音，跳过播放")
+            return
+        }
+        
+        // 应用per-pad效果器参数（仅在切换pad或效果器启用状态变化时）
+        if lastPlayedPadId != padNumber || config.isEffectEnabled {
+            applyPadEffects(config: config)
+            lastPlayedPadId = padNumber
+        }
+        
+        // 应用pad独立音量
+        let finalVelocity = velocity * config.volume
+        
+        let sample = drumSamples[padNumber]
+        let midiNote = MIDINoteNumber(sample.midiNote)
+        let midiVelocity = MIDIVelocity(finalVelocity * 127.0)
+        
+        print("🥁 Conductor.playPad: 播放 \(sample.name) - MIDI Note: \(midiNote), Velocity: \(midiVelocity), PadVolume: \(config.volume)")
+        drums.play(noteNumber: midiNote, velocity: midiVelocity)
+        print("✅ Conductor.playPad: drums.play() 已调用")
+    }
+    
+    // MARK: - Per-Pad Configuration Methods
+    
+    /// 获取指定pad的配置
+    private func getPadConfiguration(for padNumber: Int) -> PadConfiguration {
+        guard padNumber >= 0 && padNumber < padConfigurations.count else {
+            return PadConfiguration.defaultConfiguration(for: padNumber)
+        }
+        return padConfigurations[padNumber]
+    }
+    
+    /// 应用pad的效果器参数到全局效果器
+    private func applyPadEffects(config: PadConfiguration) {
+        guard config.isEffectEnabled else {
+            // 效果器禁用时使用默认值
+            reverb.dryWetMix = 0.0
+            delay.dryWetMix = 0.0
+            return
+        }
+        
+        let effects = config.effectSettings
+        
+        // 应用混响设置
+        reverb.dryWetMix = effects.reverbMix / 100.0
+        reverb.loadFactoryPreset(effects.reverbPreset.avPreset)
+        
+        // 应用延迟设置
+        delay.dryWetMix = effects.delayMix / 100.0
+        delay.feedback = effects.delayFeedback / 100.0
+        delay.time = effects.delayTime
+        
+        print("🎛 应用Pad #\(config.id)效果器: Reverb=\(effects.reverbMix)%, Delay=\(effects.delayMix)%")
+    }
+    
+    /// 更新单个pad配置
+    func updatePadConfiguration(_ config: PadConfiguration) {
+        guard config.id >= 0 && config.id < padConfigurations.count else {
+            print("⚠️ 无效的pad ID: \(config.id)")
+            return
+        }
+        
+        padConfigurations[config.id] = config
+        print("✅ Conductor: Pad #\(config.id) 配置已更新")
+    }
+    
+    /// 应用预设到Conductor
+    func applyPreset(_ preset: DrumPadPreset) {
+        padConfigurations = preset.padConfigurations
+        
+        // 重置上次播放的pad ID，强制下次播放时更新效果器
+        lastPlayedPadId = -1
+        
+        print("✅ Conductor: 预设已应用 - \(preset.name)")
+    }
+    
+    /// 获取当前所有pad配置
+    func getCurrentPadConfigurations() -> [PadConfiguration] {
+        return padConfigurations
+    }
+    
+    /// 设置pad音量
+    func setPadVolume(padId: Int, volume: Float) {
+        guard padId >= 0 && padId < padConfigurations.count else { return }
+        padConfigurations[padId].volume = max(0, min(1.0, volume))
+    }
+    
+    /// 切换pad静音状态
+    func togglePadMute(padId: Int) {
+        guard padId >= 0 && padId < padConfigurations.count else { return }
+        padConfigurations[padId].isMuted.toggle()
+    }
+    
+    /// 切换pad效果器启用状态
+    func togglePadEffects(padId: Int) {
+        guard padId >= 0 && padId < padConfigurations.count else { return }
+        padConfigurations[padId].isEffectEnabled.toggle()
     }
     
     // MARK: - MIDI Input Management
@@ -923,7 +1111,82 @@ class Conductor: ObservableObject {
         isMetronomeEnabled.toggle()
     }
     
+    // MARK: - 音频能量分析（实时波形可视化）
+    
+    /// 安装音频分析 Tap，用于采集实时音频数据并计算能量
+    func setupAudioTap() {
+        // 避免重复安装
+        guard !audioTapInstalled else {
+            print("ℹ️ Conductor: AudioTap 已安装，跳过")
+            return
+        }
+        
+        // 获取混音器的输出格式
+        let format = mixer.avAudioNode.outputFormat(forBus: 0)
+        
+        // 检查格式是否有效
+        guard format.sampleRate > 0 && format.channelCount > 0 else {
+            print("⚠️ Conductor: 无法获取有效的音频格式，AudioTap 安装失败")
+            return
+        }
+        
+        print("🎤 Conductor: 正在安装 AudioTap (sampleRate: \(format.sampleRate), channels: \(format.channelCount))...")
+        
+        // 安装 Tap 到混音器的输出
+        mixer.avAudioNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            self?.processAudioBuffer(buffer)
+        }
+        
+        audioTapInstalled = true
+        print("✅ Conductor: AudioTap 安装成功")
+    }
+    
+    /// 处理音频缓冲区，计算 RMS 能量和峰值
+    private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData else { return }
+        
+        let frameCount = Int(buffer.frameLength)
+        guard frameCount > 0 else { return }
+        
+        var sum: Float = 0.0
+        var peak: Float = 0.0
+        
+        // 计算 RMS（均方根）和峰值
+        for frame in 0..<frameCount {
+            let sample = channelData[0][frame]
+            sum += sample * sample
+            peak = max(peak, abs(sample))
+        }
+        
+        let rms = sqrt(sum / Float(frameCount))
+        
+        // 更新到主线程（带平滑处理，避免抖动）
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 使用指数平滑来避免过快的能量变化
+            let smoothingFactor: Float = 0.3
+            let newEnergy = min(rms * 10.0, 1.0) // 放大并限制在 0-1
+            let newPeak = min(peak * 2.0, 1.0)
+            
+            self.audioEnergy = self.audioEnergy * (1 - smoothingFactor) + newEnergy * smoothingFactor
+            self.audioPeakLevel = max(self.audioPeakLevel * 0.95, newPeak) // 峰值慢衰减
+        }
+    }
+    
+    /// 移除音频分析 Tap
+    func removeAudioTap() {
+        guard audioTapInstalled else { return }
+        
+        mixer.avAudioNode.removeTap(onBus: 0)
+        audioTapInstalled = false
+        print("ℹ️ Conductor: AudioTap 已移除")
+    }
+    
     deinit {
+        // Clean up audio tap
+        removeAudioTap()
+        
         // Clean up metronome timers
         stopMetronome()
         stopCountIn()

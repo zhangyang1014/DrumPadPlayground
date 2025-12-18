@@ -269,6 +269,8 @@ struct CloudKitDebuggingView: View {
                 switch status {
                 case .available:
                     debugOutput += "✅ CloudKit account is available\n"
+                case .temporarilyUnavailable:
+                    debugOutput += "⏳ iCloud temporarily unavailable\n"
                 case .noAccount:
                     debugOutput += "❌ No iCloud account configured\n"
                 case .restricted:
